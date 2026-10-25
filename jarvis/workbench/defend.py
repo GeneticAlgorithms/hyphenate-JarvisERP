@@ -194,8 +194,30 @@ def defend(run, it, question: str) -> dict:
     if run is None:
         return {"points": [], "error": "run no longer in memory"}
     run.cur = run.stages[-1]["key"]
-    run.moment("defended", "decide", f"Challenge on {it['item_id']} ({it['title']}): “{question}”. Defending from the evidence:",
+    run.moment("defended", "decide", f"Challenge on {it['item_id']} ({it['title']}): "{question}". Defending from the evidence:",
                {"item_id": it["item_id"], "question": question}, pause=0.6)
+    
+    # Check for concession - if evidence contradicts, withdraw immediately
+    concession = _check_concession(question, it)
+    if concession:
+        from jarvis.work.transition import transition
+        from jarvis.work.roles import JARVIS
+        
+        try:
+            # Execute withdrawal transition
+            transition(run.wb.db, it["item_id"], "withdraw", JARVIS, 
+                      {"concession": concession}, 
+                      reason=f"Conceding: {concession['reason']}")
+            run.log("decide", f"**CONCEDING**: {concession['reason']}", pause=1.0)
+            run.log("decide", "Proposal withdrawn — corrected version will be generated in next run", pause=0.8)
+            
+            points = [f"**CONCEDING**: {concession['reason']}. {concession['action']}."]
+            points.append("The original proposal has been withdrawn. A corrected proposal will appear in the next run.")
+            return {"points": points, "item_id": it["item_id"], "conceded": True}
+        except Exception as e:
+            run.log("warn", f"Concession failed: {e}", pause=0.5)
+            # Fall through to normal defense
+    
     points = [_address(question, it)]
     run.log("decide", f"① {points[-1]}", pause=0.8)
     for e in _evidence(run, it):
