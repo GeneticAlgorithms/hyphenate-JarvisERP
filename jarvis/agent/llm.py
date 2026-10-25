@@ -102,22 +102,34 @@ def client():
     return _client
 
 
-def complete(system: str, user: str, fast: bool = False, max_tokens: int = 2000) -> str | None:
+def complete(system: str, user: str, fast: bool = False, max_tokens: int = 2000, timeout: float | None = None) -> str | None:
     if not available():
         return None
     try:
         models = _select_models()
         model_id = models["fast"] if fast else models["reasoning"]
-        msg = client().messages.create(
-            model=model_id, max_tokens=max_tokens,
-            system=system, messages=[{"role": "user", "content": user}])
+        
+        # Create kwargs for client call
+        kwargs = {
+            "model": model_id,
+            "max_tokens": max_tokens,
+            "system": system,
+            "messages": [{"role": "user", "content": user}]
+        }
+        
+        # Add timeout if specified
+        if timeout is not None:
+            kwargs["timeout"] = timeout
+        
+        msg = client().messages.create(**kwargs)
         return "".join(b.text for b in msg.content if getattr(b, "type", "") == "text").strip()
-    except Exception as e:  # network / quota - fall back to templates
+    except Exception as e:  # network / quota / timeout - fall back to templates
         return None
 
 
-def complete_json(system: str, user: str, fast: bool = True) -> dict | None:
-    out = complete(system + "\nRespond with a single JSON object and nothing else.", user, fast=fast)
+def complete_json(system: str, user: str, fast: bool = True, timeout: float | None = None) -> dict | None:
+    """Complete with JSON response. Returns dict on success, None on failure."""
+    out = complete(system + "\nRespond with a single JSON object and nothing else.", user, fast=fast, timeout=timeout)
     if not out:
         return None
     try:
