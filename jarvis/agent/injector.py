@@ -207,6 +207,8 @@ def parse(text: str) -> tuple[str, dict]:
             llm_result = llm.complete_json(
                 f"Extract accounting scenario details. Schema: {json.dumps(schema)}. "
                 f"ONLY extract explicitly stated facts. Use null for unstated fields. "
+                f"For dates: ONLY extract if an actual date is stated (e.g., '9/14', 'Sept 15'). "
+                f"'for September' or 'in September' without a specific date -> null. "
                 f"Validate vendor/employee names against provided lists.",
                 f"Judge text: {text}",
                 fast=True,
