@@ -20,12 +20,14 @@ TABS = [
 class TestWorkbenchRun:
     """Test /api/wb/run for each tab."""
     
+    @classmethod
     @pytest.fixture(scope="class", autouse=True)
-    def server_running(self):
+    def server_running(cls):
         """Verify server is up before running tests."""
         try:
             resp = requests.get(f"{BASE_URL}/api/state", timeout=5)
             assert resp.status_code == 200
+            yield
         except Exception as e:
             pytest.skip(f"Server not running: {e}")
     
