@@ -531,7 +531,7 @@ async function loadAudit(id) {
   $("#auditMsg").textContent = `${rows.length} rows for ${id}`;
   $("#auditTable").replaceChildren(h("table", { class: "t" },
     h("tr", {}, ["#", "at (UTC)", "actor", "role", "action", "subject", "allowed", "reason", "prev → hash"].map(x => h("th", {}, x))),
-    rows.map(r => h("tr", { class: r.allowed ? "" : "deny-row" }, h("td", { class: "n" }, r.seq), h("td", {}, (r.at || "").slice(11, 23)),
+    rows.map(r => h("tr", { class: r.allowed ? "" : "deny-row", "data-seq": r.seq }, h("td", { class: "n" }, r.seq), h("td", {}, (r.at || "").slice(11, 23)),
       h("td", {}, r.actor), h("td", {}, r.actor_role), h("td", {}, r.action), h("td", {}, r.subject), h("td", {}, r.allowed ? "✓" : "✗ denied"),
       h("td", {}, r.reason), h("td", { title: `${r.prev_hash}\n→ ${r.hash}` }, `${String(r.prev_hash).slice(0, 6)} → ${String(r.hash).slice(0, 8)}`)))));
 }
