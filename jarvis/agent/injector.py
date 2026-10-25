@@ -333,7 +333,9 @@ def inject(session, text: str | None = None, template: str | None = None, params
                             "cardholder": params.get("cardholder", "J. Ortiz"),
                             "last4": "8812", "mcc": "5943", "department": "Live", 
                             "category": "Supplies", "memo": f"Split {i+1}/{count}", 
-                            "receipt": "Yes", "threshold_split": True},
+                            "receipt": "Yes", "threshold_split": True,
+                            "ramp_vendor": merchant,
+                            "erp_vendor": merchant},
                            {"injected": text or template, "threshold_split": True}, "injector", 0)
                     # Get the record_id
                     rec = db.one("SELECT record_id FROM records WHERE src_id=?", (rid,))
