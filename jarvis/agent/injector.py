@@ -249,6 +249,9 @@ def parse(text: str) -> tuple[str, dict]:
         params["cardholder"] = cardholder
     
     # Classify (be conservative - use needs_info if unclear)
+    # Check for described bank line first (e.g. "$742.18 SQ *MOONLIGHT GEAR 9/29")
+    has_bank_descriptor = bool(re.search(r'\$[\d,]+\.\d{2}\s+[A-Z*]+\s+', text))
+    
     if any(w in t_lower for w in ["bank", "acct"]) and any(w in t_lower for w in ["change", "switch", "new"]):
         k = "vendor_bank_change"
     elif "split" in t_lower or re.search(r'(two|three|four|five|six|\d)\s+.*charges', t_lower):
@@ -266,6 +269,14 @@ def parse(text: str) -> tuple[str, dict]:
         k = "paypal_bundle"
     elif any(w in t_lower for w in ["nordstrom", "sephora"]) or (cardholder and "spent" in t_lower):
         k = "personal_card"
+    elif has_bank_descriptor or (amount and "description" in params):
+        # Described bank line -> unknown_debit
+        k = "unknown_debit"
+        if not params.get("description"):
+            # Extract the descriptor portion
+            m = re.search(r'\$[\d,]+\.\d{2}\s+([A-Z*][A-Z0-9*\s]+)', text)
+            if m:
+                params["description"] = m.group(1).strip()
     elif "wire" in t_lower and " in" in t_lower:
         k = "needs_info"  # Incoming wire
     elif "boat" in t_lower or "auditor" in t_lower:
@@ -288,22 +299,45 @@ def parse(text: str) -> tuple[str, dict]:
 
 def _id(*parts) -> str:
     """Generate unique ID including timestamp to avoid silent no-ops on repeated injects."""
-    timestamp = str(int(now().replace("T", "").replace(":", "").replace(".", "").replace("Z", "")[:14]))
+    timestamp = str(int(now().replace("-", "").replace("T", "").replace(":", "").replace(".", "").replace("Z", "")[:14]))
     return hashlib.md5((timestamp + "|" + "|".join(map(str, parts))).encode()).hexdigest()[:10].upper()
 
 
 def _match_vendor(name: str) -> dict | None:
-    """Fuzzy match vendor name against vendor master (e.g., 'Lumen Crew' -> 'Lumen Crew LLC')."""
+    """Fuzzy match vendor name against vendor master with case-insensitive token/prefix matching."""
     if not name:
         return None
     name_lower = name.lower().strip()
+    name_tokens = set(name_lower.split())
+    
+    # First pass: exact match
     for v in bible.VENDORS:
         if v["qbo_name"].lower() == name_lower:
             return v
-        if name_lower in v["qbo_name"].lower() or v["qbo_name"].lower() in name_lower:
+    
+    # Second pass: substring match
+    for v in bible.VENDORS:
+        vendor_lower = v["qbo_name"].lower()
+        if name_lower in vendor_lower or vendor_lower in name_lower:
             return v
         if name_lower in v.get("legal", "").lower():
             return v
+    
+    # Third pass: token matching (e.g. "Advanced Solutions" matches "Advanced Solutions Inc")
+    for v in bible.VENDORS:
+        vendor_lower = v["qbo_name"].lower()
+        vendor_tokens = set(vendor_lower.split())
+        # Match if all non-trivial input tokens appear in vendor name
+        significant_tokens = name_tokens - {"inc", "llc", "corp", "co", "ltd", "gmbh", "b.v."}
+        if significant_tokens and significant_tokens.issubset(vendor_tokens):
+            return v
+    
+    # Fourth pass: prefix matching (e.g. "lumen" matches "Lumen Crew LLC")
+    for v in bible.VENDORS:
+        vendor_lower = v["qbo_name"].lower()
+        if any(vendor_lower.startswith(tok) or tok in vendor_lower for tok in name_tokens if len(tok) >= 4):
+            return v
+    
     return None
 
 
@@ -312,6 +346,7 @@ def inject(session, text: str | None = None, template: str | None = None, params
     db, eng = session.db, session.engine
     created = []
     tag = uuid.uuid4().hex[:6]
+    from_free_text = bool(text and not template)
     
     try:
         if text and not template:
@@ -365,7 +400,44 @@ def inject(session, text: str | None = None, template: str | None = None, params
             events.publish("inject_error", error="unknown_template", template=template, text=text)
             return {"error": "unknown_template", "template": template, "text": text, "items": []}
         
-        params = {**TEMPLATES[template]["params"], **(params or {})}
+        # CRITICAL: For free text, NEVER merge template defaults - only use parsed values
+        # For explicit template calls, merge defaults as expected
+        if from_free_text:
+            # Validate required fields from parsed params
+            required_fields = {
+                "vendor_bank_change": ["vendor", "amount"],
+                "split_purchases": ["amounts"],
+                "ghost_vendor": ["vendor", "amount"],
+                "refund_as_revenue": ["merchant", "amount"],
+                "personal_card": ["merchant", "amount"],
+                "duplicate_bill": ["vendor", "amount"],
+                "invoice_over_accrual": ["vendor", "amount"],
+                "paypal_bundle": ["payments"],
+                "unknown_debit": ["amount", "description"]
+            }
+            
+            missing = []
+            for field in required_fields.get(template, []):
+                if field not in params or not params[field]:
+                    missing.append(field)
+            
+            if missing:
+                # Return needs_info instead of inventing data
+                anchor = f"inject:needs_info:{tag}"
+                it = create_item(db, SYNC, "judge_scenario", anchor,
+                                f"Judge scenario needs clarification: missing {', '.join(missing)}",
+                                "2026-09", [])
+                question = f"I classified this as {TEMPLATES[template]['label']} but couldn't extract {', '.join(missing)}. Original text: \"{text[:150]}\""
+                rationale = f"Required fields missing from free text: {', '.join(missing)}"
+                patch = {"question": question, "rationale": rationale, "injected": text}
+                it = transition(db, it["item_id"], "ask", JARVIS, patch, reason=rationale)
+                created.append(it)
+                return {"template": "needs_info", "params": params, "parser": params.get("_parser", "deterministic"),
+                        "items": [{"item_id": it["item_id"], "state": it["state"], "kind": it["kind"],
+                                  "title": it["title"], "rationale": rationale, "parser": params.get("_parser", "deterministic")}]}
+        else:
+            # Explicit template call - merge defaults
+            params = {**TEMPLATES[template]["params"], **(params or {})}
         
         with db.tx():
             append_audit(db, SYNC, "inject", f"scenario:{template}", True,
@@ -460,10 +532,14 @@ def inject(session, text: str | None = None, template: str | None = None, params
         cents = abs(to_cents(params["amount"]))
         bill_id = f"BILL-INJ-{tag}"
         bje = f"JE-INJB-{tag}"
+        bill_exists = False
+        
         with db.tx():
-            if db.one("SELECT 1 FROM bills WHERE vendor_id=? AND service_period='2026-09' AND date > '2026-09-30'", (v["id"],)):
-                pass
-            else:
+            existing_bill = db.one("SELECT 1 FROM bills WHERE vendor_id=? AND service_period='2026-09' AND date > '2026-09-30'", (v["id"],))
+            bill_exists = bool(existing_bill)
+            
+            if not bill_exists:
+                # Create the bill
                 db.conn.execute("INSERT INTO ledger_entries VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
                                 (bje, "2026-10-09", "2026-10", f"{v['qbo_name']} services 2026-09", v["qbo_name"], "Bill",
                                  f"INJ-{tag}", "ap_clerk", J({"bill_id": bill_id}), None, "ap_clerk", now()))
@@ -472,9 +548,28 @@ def inject(session, text: str | None = None, template: str | None = None, params
                 db.conn.execute("INSERT INTO bills VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
                                 (bill_id, v["id"], v["qbo_name"], "2026-10-09", "2026-11-08", cents, f"INJ-{tag}",
                                  f"{v['qbo_name']} services 2026-09", v["default_acct"], "Open", "2026-09", bje))
+        
+        # ALWAYS create work item even if bill exists
         before = {r["item_id"] for r in db.q("SELECT item_id FROM work_items")}
         eng.run_october()
-        created = [get_item(db, r["item_id"]) for r in db.q("SELECT item_id FROM work_items") if r["item_id"] not in before]
+        new_items = [get_item(db, r["item_id"]) for r in db.q("SELECT item_id FROM work_items") if r["item_id"] not in before]
+        
+        # If no items were auto-created (bill existed), create one manually
+        if not new_items:
+            anchor = f"inject:accrual:{tag}:{v['id']}"
+            it = create_item(db, SYNC, "invoice_over_accrual", anchor,
+                            f"Review: {v['qbo_name']} invoiced ${params['amount']:.2f} vs accrued amount",
+                            "2026-09", [],
+                            evidence=[{"type": "bill", "id": bill_id if not bill_exists else "existing",
+                                      "source": "bills", "desc": f"Invoice for ${params['amount']:.2f}"}])
+            question = f"Review accrual variance for {v['qbo_name']}: invoice shows ${params['amount']:.2f}. Verify against accrued amount and adjust if needed."
+            rationale = f"{v['qbo_name']} invoice amount ${params['amount']:.2f} needs reconciliation with accrual."
+            patch = {"vendor": v["qbo_name"], "vendor_id": v["id"], "invoice_amount": cents,
+                    "question": question, "rationale": rationale, "injected": text or template}
+            it = transition(db, it["item_id"], "ask", JARVIS, patch, reason=rationale)
+            new_items.append(it)
+        
+        created = new_items
     
     elif template == "vendor_bank_change":
         # Create work item for vendor bank detail change - MUST verify via callback before payment
@@ -668,59 +763,53 @@ def inject(session, text: str | None = None, template: str | None = None, params
         created.append(it)
     
     elif template == "refund_as_revenue":
-        # Customer refund incorrectly booked as revenue - propose reclass
+        # Customer refund incorrectly booked as revenue - flag for review, NOT direct post
         merchant = params.get("merchant", "Bay Rig Rentals")
         cents = int(params["amount"] * 100)
         d = params.get("date", "2026-09-25")
         
         # Create the incorrect revenue entry first (simulating the misclassification)
+        # BUT: do NOT directly debit 1010 without a bank record
+        wrong_eid = f"JE-WRONGREV-{tag}"
         with db.tx():
-            # Wrong entry: booked to revenue
-            wrong_eid = f"JE-WRONGREV-{tag}"
-            db.conn.execute("INSERT INTO ledger_entries VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
-                           (wrong_eid, d, d[:7], f"Refund from {merchant} (MISCLASSIFIED)", merchant,
-                            "Revenue", "", "stripe_sync", J({"refund": True}), None, "stripe_sync", now()))
-            db.conn.execute("INSERT INTO ledger_lines VALUES(?,?,?,?,?,?)", (wrong_eid, 0, "1010", cents, "", None))
-            db.conn.execute("INSERT INTO ledger_lines VALUES(?,?,?,?,?,?)", (wrong_eid, 1, "4950", -cents, "", None))
+            # Only create the wrong ledger entry if there's a corresponding bank record
+            # For now, create a memo-only item that DESCRIBES the issue
+            pass
         
-        # Create work item to reclass it
+        # Create work item to flag this issue for review
         anchor = f"inject:refund:{tag}:{merchant.replace(' ', '_')}"
-        it = create_item(db, SYNC, "refund_reclass", anchor,
-                        f"Reclass needed: +${params['amount']:.2f} from {merchant} is refund, not revenue",
-                        d[:7], [],
-                        evidence=[{"type": "ledger", "id": f"JE-WRONGREV-{tag}", "source": "ledger_entry",
-                                  "desc": f"Incorrectly booked to 4950 Other Income"}])
         
-        # Propose the reclassification entry
-        # Debit 4950 (reverse the revenue), Credit proper account (contra-expense or AR)
         # Find the original expense account for this vendor
         original_acct = "5020"  # Bay Rig Rentals is gear rental
         v = next((x for x in bible.VENDORS if merchant in x["qbo_name"] or x["qbo_name"] in merchant), None)
         if v:
             original_acct = v.get("default_acct", "5020")
         
+        it = create_item(db, SYNC, "refund_reclass", anchor,
+                        f"Review needed: ${params['amount']:.2f} from {merchant} may be refund booked as revenue",
+                        d[:7], [],
+                        evidence=[{"type": "alert", "id": f"refund-{tag}", "source": "scenario",
+                                  "desc": f"${params['amount']:.2f} from {merchant} described as refund but may be in 4950 Other Income"}])
+        
+        # Route through NEEDS_INFO for review (not PROPOSED)
+        question = f"Review: Is the ${params['amount']:.2f} credit from {merchant} on {d} a customer refund incorrectly booked to 4950 Other Income? If so, it should be reclassified to contra-expense account {original_acct} ({bible.acct_name(original_acct)})."
+        rationale = f"Potential misclassification: ${params['amount']:.2f} from {merchant} may be a refund booked as revenue instead of contra-expense."
+        
         patch = {
             "merchant": merchant,
             "amount_cents": cents,
             "date": d,
-            "wrong_entry": f"JE-WRONGREV-{tag}",
+            "question": question,
+            "rationale": rationale,
             "booked_to": "4950",
             "should_be_contra": original_acct,
-            "proposal": {
-                "date": d,
-                "memo": f"Reclass {merchant} refund from revenue to contra-expense",
-                "lines": [
-                    {"acct": "4950", "cents": cents, "memo": "Reverse incorrect revenue"},
-                    {"acct": original_acct, "cents": -cents, "memo": f"Contra-expense: {merchant} refund"}
-                ],
-                "txn_type": "Journal Entry",
-                "match_entries": [f"JE-WRONGREV-{tag}"]
-            },
-            "rationale": f"${params['amount']:.2f} credit from {merchant} was booked to 4950 Other Income, but this is a customer refund for services/rentals and should be recorded as a contra-expense in {original_acct} {bible.acct_name(original_acct)}",
+            "requires_review": True,
             "injected": text or template
         }
-        it = transition(db, it["item_id"], "propose", JARVIS, patch,
-                       reason=f"Refund from {merchant} misclassified as revenue (4950); proposing reclass to contra-expense ({original_acct})")
+        
+        # Route through ask (NEEDS_INFO) so it goes through proper review workflow
+        it = transition(db, it["item_id"], "ask", JARVIS, patch,
+                       reason=f"Potential refund from {merchant} misclassified as revenue - flagging for review")
         created.append(it)
     
     elif template == "paypal_bundle":

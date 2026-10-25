@@ -1,0 +1,114 @@
+[
+  {
+    "test": 1,
+    "description": "Vendor bank change from lookalike domain",
+    "prompt": "Lumen Crew LLC emailed new bank details from lumencrew.co before the $18,400 payment",
+    "status": "ERROR",
+    "error": "('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))"
+  },
+  {
+    "test": 2,
+    "description": "Split purchases to evade approval threshold",
+    "prompt": "Three $2,450 Ramp charges to the same vendor on 9/20 under the $2,500 approval limit",
+    "status": "ERROR",
+    "error": "HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/inject (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7efcf6de6840>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+  },
+  {
+    "test": 3,
+    "description": "Ghost vendor with no W-9",
+    "prompt": "Payment to 'Advanced Solutions Inc' for $8,500 but vendor doesn't exist in master",
+    "status": "ERROR",
+    "error": "HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/inject (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7efcf6de6f30>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+  },
+  {
+    "test": 4,
+    "description": "Refund misclassified as revenue",
+    "prompt": "Bank shows +$1,200 refund from Bay Rig Rentals booked to revenue",
+    "status": "ERROR",
+    "error": "HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/inject (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7efcf6de7620>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+  },
+  {
+    "test": 5,
+    "description": "Parse cardholder name 'Maya' correctly",
+    "prompt": "Nordstrom $250 on Maya's card 9/14",
+    "status": "ERROR",
+    "error": "HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/inject (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7efcf6db4f20>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+  },
+  {
+    "test": 6,
+    "description": "Parse count, source, vendor, limit from split purchase text",
+    "prompt": "Three $2,450 Ramp charges to Office Depot on 9/20 under the $2,500 approval limit",
+    "status": "ERROR",
+    "error": "HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/inject (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7efcf6de73e0>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+  },
+  {
+    "test": 7,
+    "description": "Sam's card should map to Sam Rivera",
+    "prompt": "$500 charge at Sephora on Sam's card",
+    "status": "ERROR",
+    "error": "HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/inject (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7efcf6de6db0>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+  },
+  {
+    "test": 8,
+    "description": "Lee's card should map to Lee Okafor",
+    "prompt": "Lee's card used at Steam for $45 gaming purchase",
+    "status": "ERROR",
+    "error": "HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/inject (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7efcf6de66f0>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+  },
+  {
+    "test": 9,
+    "description": "Generic vendor bank change",
+    "prompt": "Email from vendor requesting bank change for $25,000 wire transfer",
+    "status": "ERROR",
+    "error": "HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/inject (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7efcf6de5d60>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+  },
+  {
+    "test": 10,
+    "description": "Four split purchases",
+    "prompt": "Four charges to 'Staples' for $499 each on September 15",
+    "status": "ERROR",
+    "error": "HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/inject (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7efcf6e28470>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+  },
+  {
+    "test": 11,
+    "description": "Ghost vendor alternative phrasing",
+    "prompt": "Wire to 'Consulting Services LLC' $12,000 - no contract on file",
+    "status": "ERROR",
+    "error": "HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/inject (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7efcf7f58680>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+  },
+  {
+    "test": 12,
+    "description": "Refund alternative phrasing",
+    "prompt": "Received $3,500 credit from equipment vendor, recorded as other income",
+    "status": "ERROR",
+    "error": "HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/inject (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7efcf6de5580>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+  },
+  {
+    "test": 13,
+    "description": "Unknown debit baseline",
+    "prompt": "Unknown debit $742.18 labeled 'SQ *MOONLIGHT GEAR CO'",
+    "status": "ERROR",
+    "error": "HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/inject (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7efcf6de6660>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+  },
+  {
+    "test": 14,
+    "description": "Duplicate bill detection",
+    "prompt": "Notion billed us twice for $96 subscription",
+    "status": "ERROR",
+    "error": "HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/inject (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7efcf6de71d0>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+  },
+  {
+    "test": 15,
+    "description": "PayPal bundle payment",
+    "prompt": "PayPal transfer for Damlicht crew payment 900 EUR and Splice subscription $24.99",
+    "status": "ERROR",
+    "error": "HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/inject (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7efcf6de7bf0>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+  },
+  {
+    "test": 16,
+    "description": "Invoice over accrual",
+    "prompt": "Lumen Crew invoiced $13,020 but we only accrued $12,000",
+    "status": "ERROR",
+    "error": "HTTPConnectionPool(host='localhost', port=8000): Max retries exceeded with url: /api/inject (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7efcf6e288f0>: Failed to establish a new connection: [Errno 111] Connection refused'))"
+  }
+]
