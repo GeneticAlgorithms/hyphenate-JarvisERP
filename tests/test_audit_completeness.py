@@ -18,7 +18,7 @@ def test_llm_calls_logged(tmp_path):
     db = DB(str(tmp_path / "test.db"))
     
     # Quick LLM call with db
-    result = llm.complete("Say 'test'", "This is a test", db=db, actor_name="test")
+    result = llm.complete("Say 'test'", "This is a test", db=db, actor_name="jarvis")
     
     # Check audit
     llm_rows = db.q("SELECT * FROM audit_log WHERE action LIKE 'llm_%'")
