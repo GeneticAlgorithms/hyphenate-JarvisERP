@@ -227,14 +227,13 @@ def inject(session, text: str | None = None, template: str | None = None, params
         # Freeze payment work item, mark NEEDS_INFO, request callback
         v = next((x for x in bible.VENDORS if x["qbo_name"] == params["vendor"]), None)
         if v:
-            with db.tx():
-                anchor = f"inject:bank_change:{tag}"
-                it = create_item(db, SYNC, "bank_change", anchor, f"Vendor {params['vendor']} changed bank details before ${params['amount']/100:.2f} payment",
-                                "2026-09", [])
-                patch = {"alert": f"Vendor {params['vendor']} emailed new bank details before payment", "amount_cents": int(params['amount'] * 100),
-                         "requires": "callback_verification", "injected": text or template}
-                transition(db, it["item_id"], "needs_info", JARVIS, patch, reason="Bank detail change requires verification call")
-                created.append(it)
+            anchor = f"inject:bank_change:{tag}"
+            it = create_item(db, SYNC, "bank_change", anchor, f"Vendor {params['vendor']} changed bank details before ${params['amount']/100:.2f} payment",
+                            "2026-09", [])
+            patch = {"alert": f"Vendor {params['vendor']} emailed new bank details before payment", "amount_cents": int(params['amount'] * 100),
+                     "requires": "callback_verification", "injected": text or template}
+            transition(db, it["item_id"], "needs_info", JARVIS, patch, reason="Bank detail change requires verification call")
+            created.append(it)
     
     elif template == "split_purchases":
         # Create N charges, flag threshold splitting
