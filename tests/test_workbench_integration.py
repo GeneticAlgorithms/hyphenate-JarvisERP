@@ -12,10 +12,12 @@ from jarvis.api import server
 # Use TestClient instead of real server
 @pytest.fixture(scope="module")
 def client():
-    """Create test client."""
+    """Create test client with speed=0 for deterministic tests."""
     with TestClient(server.app) as c:
-        # Note: speed setting removed - tests use default Workbench speed
-        # User specifies speed=0 at workbench creation for unit tests (test_workbench.py)
+        # Set speed to 0 to eliminate animation delays in tests
+        # The endpoint expects Body(..., embed=True) so pass the float directly
+        resp = c.post("/api/wb/speed", json=0.0)
+        assert resp.status_code == 200, f"Failed to set speed: {resp.text}"
         yield c
 
 TABS = [
