@@ -69,6 +69,13 @@ def _parse_amount(text: str) -> float | None:
     if m:
         return float(m.group(1).replace(",", ""))
     
+    # Try "2500 dollars" format (no $ sign)
+    m = re.search(r'\b([\d,]+(?:\.\d{1,2})?)\s*dollars?\b', text.lower())
+    if m:
+        amt = float(m.group(1).replace(",", ""))
+        if amt >= 1:
+            return amt
+    
     return None
 
 
@@ -97,7 +104,18 @@ def _match_cardholder(text: str) -> str | None:
     t_lower = text.lower()
     for person in bible.PEOPLE.values():
         first = person["name"].split()[0].lower()
-        if any(p in t_lower for p in [f"{first}'s card", f"{first} spent", f"{first} bought"]):
+        full_name = person["name"].lower()
+        # Match various patterns
+        patterns = [
+            f"{first}'s card",
+            f"{first} spent",
+            f"{first} bought",
+            f"cardholder {first}",
+            f"cardholder {full_name}",
+            f"cardholder: {first}",
+            f"cardholder: {full_name}"
+        ]
+        if any(p in t_lower for p in patterns):
             return person["name"]
     return None
 
@@ -222,26 +240,43 @@ def parse(text: str) -> tuple[str, dict]:
     if date:
         params["date"] = date
     
-    # Extract vendor (prefer fuzzy match against master)
+    # Extract vendor/merchant (prefer fuzzy match against master)
     quoted = re.search(r'["\']([^"\']{2,50})["\']', text)
     if quoted:
         v = _match_vendor(quoted.group(1))
         params["vendor"] = v["qbo_name"] if v else quoted.group(1)
         params["merchant"] = params["vendor"]
     else:
+        # Try vendor master first
         for v in bible.VENDORS:
             if v["qbo_name"].lower() in t_lower:
                 params["vendor"] = v["qbo_name"]
                 params["merchant"] = v["qbo_name"]
                 break
         
-        # Try "from X" pattern for vendors not in master
-        if "vendor" not in params:
-            m = re.search(r'\bfrom\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)', text)
+        # Try common merchant patterns (Nordstrom, Sephora, Steam, etc.)
+        if "vendor" not in params and "merchant" not in params:
+            # Pattern: "at X" or "from X"
+            m = re.search(r'\b(?:at|from)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)', text)
             if m:
                 name = m.group(1)
                 matched = _match_vendor(name)
-                params["vendor"] = matched["qbo_name"] if matched else name
+                if matched:
+                    params["vendor"] = matched["qbo_name"]
+                    params["merchant"] = matched["qbo_name"]
+                else:
+                    params["merchant"] = name
+            # Pattern: capitalized word before amount/card/purchase (e.g. "Nordstrom $250", "Steam purchase $45")
+            elif not m:
+                m = re.search(r'\b([A-Z][a-z]{3,}(?:\s+[A-Z][a-z]+)?)\s+(?:\$|purchase|charge)', text)
+                if m:
+                    name = m.group(1)
+                    matched = _match_vendor(name)
+                    if matched:
+                        params["vendor"] = matched["qbo_name"]
+                        params["merchant"] = matched["qbo_name"]
+                    else:
+                        params["merchant"] = name
     
     # Extract cardholder
     cardholder = _match_cardholder(text)
@@ -252,22 +287,38 @@ def parse(text: str) -> tuple[str, dict]:
     # Check for described bank line first (e.g. "$742.18 SQ *MOONLIGHT GEAR 9/29")
     has_bank_descriptor = bool(re.search(r'\$[\d,]+\.\d{2}\s+[A-Z*]+\s+', text))
     
-    if any(w in t_lower for w in ["bank", "acct"]) and any(w in t_lower for w in ["change", "switch", "new"]):
+    # Vendor bank change - broader pattern matching
+    if (any(w in t_lower for w in ["bank details", "bank account", "bank acct", "banking"]) or 
+        (("bank" in t_lower or "acct" in t_lower) and any(w in t_lower for w in ["change", "changed", "switch", "switched", "new"]))):
         k = "vendor_bank_change"
-    elif "split" in t_lower or re.search(r'(two|three|four|five|six|\d)\s+.*charges', t_lower):
+        # Try to extract vendor from beginning of text if not already extracted
+        if "vendor" not in params and "merchant" not in params:
+            # Pattern: capitalized word(s) at start or after "vendor"
+            m = re.search(r'^([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)', text)
+            if m:
+                name = m.group(1)
+                matched = _match_vendor(name)
+                if matched:
+                    params["vendor"] = matched["qbo_name"]
+                else:
+                    params["vendor"] = name
+    elif "split" in t_lower or re.search(r'(two|three|four|five|six|\d)\s+.*(?:charges|purchases)', t_lower):
         k = "split_purchases"
         params.update(_parse_split_purchases(text))
-    elif any(w in t_lower for w in ["no w-9", "w9", "po box", "upfront", "never heard"]):
+    elif any(w in t_lower for w in ["no w-9", "w9", "po box", "upfront", "never heard", "doesn't exist", "don't exist"]):
         k = "ghost_vendor"
-    elif ("refund" in t_lower or "credit" in t_lower) and ("revenue" in t_lower or "income" in t_lower):
+    elif ("refund" in t_lower or "credit" in t_lower) and ("revenue" in t_lower or "income" in t_lower or "booked as" in t_lower or "recorded as" in t_lower):
         k = "refund_as_revenue"
-    elif "twice" in t_lower or ("paid" in t_lower and "again" in t_lower):
+    elif "refund" in t_lower and amount and params.get("merchant"):
+        # Simple refund mention with merchant and amount
+        k = "refund_as_revenue"
+    elif "twice" in t_lower or ("paid" in t_lower and "again" in t_lower) or ("two bills" in t_lower):
         k = "duplicate_bill"
     elif ("accrued" in t_lower or "invoiced" in t_lower) and ("more" in t_lower or "showed up" in t_lower):
         k = "invoice_over_accrual"
     elif "paypal" in t_lower and ("eur" in t_lower or "fx" in t_lower):
         k = "paypal_bundle"
-    elif any(w in t_lower for w in ["nordstrom", "sephora"]) or (cardholder and "spent" in t_lower):
+    elif any(w in t_lower for w in ["nordstrom", "sephora", "steam"]) or (params.get("merchant") and cardholder):
         k = "personal_card"
     elif has_bank_descriptor or (amount and "description" in params):
         # Described bank line -> unknown_debit
@@ -277,21 +328,23 @@ def parse(text: str) -> tuple[str, dict]:
             m = re.search(r'\$[\d,]+\.\d{2}\s+([A-Z*][A-Z0-9*\s]+)', text)
             if m:
                 params["description"] = m.group(1).strip()
-    elif "wire" in t_lower and " in" in t_lower:
+    elif "wire" in t_lower and (" in" in t_lower or "incoming" in t_lower):
         k = "needs_info"  # Incoming wire
     elif "boat" in t_lower or "auditor" in t_lower:
         k = "needs_info"  # Off-topic
     else:
         k = "needs_info"
     
-    # Verify we have key data for classified scenario
-    if k == "vendor_bank_change" and ("vendor" not in params or "amount" not in params):
+    # Verify we have key data for classified scenario - but be less strict
+    if k == "vendor_bank_change" and not (params.get("vendor") or params.get("merchant")):
         k = "needs_info"
-    elif k == "split_purchases" and "amount" not in params and "amounts" not in params:
+    elif k == "split_purchases" and not (params.get("amount") or params.get("amounts") or params.get("count")):
         k = "needs_info"
-    elif k == "ghost_vendor" and "vendor" not in params:
+    elif k == "ghost_vendor" and not (params.get("vendor") or params.get("merchant")):
         k = "needs_info"
-    elif k == "refund_as_revenue" and "amount" not in params:
+    elif k == "refund_as_revenue" and not params.get("amount"):
+        k = "needs_info"
+    elif k == "personal_card" and not params.get("merchant"):
         k = "needs_info"
     
     return k, params
