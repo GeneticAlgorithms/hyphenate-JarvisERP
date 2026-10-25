@@ -19,8 +19,8 @@
   
   /* Neutrals */
   --ink: #1c1917;
-  --ink2: #57534e;
-  --mute: #a8a29e;
+  --ink2: #44403c;
+  --mute: #78716c;
   --cream: #fef7ee;
   
   /* Semantic */
@@ -250,6 +250,7 @@ h3 { font-size: 1.75rem; margin-bottom: 1rem; }
   padding: var(--space-xl) 0;
   display: flex;
   align-items: center;
+  scroll-margin-top: 100px;
 }
 
 .section:first-of-type {
