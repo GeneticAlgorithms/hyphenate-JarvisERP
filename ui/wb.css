@@ -9,6 +9,7 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }
 body { background: var(--paper); color: var(--ink); font: 13.5px/1.5 var(--sans); overflow: hidden; display: flex; flex-direction: column; -webkit-font-smoothing: antialiased; }
+body.landing-page { overflow: auto; }
 button, select, textarea, input { font: inherit; color: inherit; }
 .hidden { display: none !important; }
 .muted { color: var(--mute); font: 11.5px var(--mono); }
