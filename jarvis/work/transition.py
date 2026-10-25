@@ -5,6 +5,7 @@
      |                 +--ask--> NEEDS_INFO --answer--> NEW (agent re-plans with the answer)
      +--ask--> NEEDS_INFO          PROPOSED --reject--> REJECTED (becomes a precedent; agent re-plans as a new item)
      +--dismiss--> DISMISSED (agent found nothing to do, with a reason)
+                       PROPOSED --withdraw--> DISMISSED (agent supersedes its own stale proposal)
 
 Every transition - allowed or denied - writes one audit row in the SAME transaction as the change.
 """
@@ -30,6 +31,7 @@ TRANSITIONS = {
     ("PROPOSED", "review"): "PROPOSED",
     ("PROPOSED", "approve"): "APPROVED",
     ("PROPOSED", "reject"): "REJECTED",
+    ("PROPOSED", "withdraw"): "DISMISSED",   # agent supersedes its own stale proposal (e.g. package v1 after a late QBO change)
     ("NEEDS_INFO", "answer"): "NEW",
     ("NEEDS_INFO", "propose"): "PROPOSED",   # agent proposes while still waiting (e.g. accrue AND chase vendor)
     ("APPROVED", "post"): "POSTED",

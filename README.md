@@ -6,6 +6,29 @@
 
 ---
 
+## The Workbench: five tabs, five close problems (`make up` → http://localhost:8000)
+
+Each tab is one problem our accountant teammate described, in her words. Each has its own **raw, messy inputs**, an agent you can task with one click, and a pipeline where **every stage logs what it did**. Every log line is a row in the hash-chained audit log. Nothing changes a system of record until the Controller approves it. Only the Gateway applies changes.
+
+| Tab | Raw inputs (deliberately messy) | What the agent does, stage by stage | Needs your approval |
+|---|---|---|---|
+| **01 Timing & Accruals** | Chase CSV with a duplicate row, a blank line, `(49,306.71)` and 2-digit years; OCR'd interest notice reading `$1,O42.17`; QBO GL export with title/total/footer rows; timesheet with `8.5h`, `eight`, duplicate, unapproved and TOTAL rows; SOWs; vendor email saying "around 10k" | Clean & normalize (every fix logged before→after), detect Sep-earned/Oct-received interest, find unbilled work, measure it (timesheet vs SOW vs email), **simulated vendor outreach** (Lumen confirms an overtime premium; Nadia never answers, so it escalates), draft entries with Oct 1 reversals, validate | 4 accruals as balanced JEs. Reject with "use $13,500" and the agent re-proposes |
+| **02 Package Roll-forward** | August package workbook + QBO P&L/BS/CF "Export to Excel" files (title rows, indents, numbers stored as text, footer); new GL account 6455; a renamed 6410 | Parse the reports into data, map by account number, add the Sep column, **insert and label the new row**, rewrite formulas, 4 tie-outs, flux comments with GL drivers, write the workbook. **⚡ Late QBO change**: re-ingests the 3 re-downloaded exports, hash-diffs them, shows the exact cells that changed, rebuilds, and withdraws the stale v1 sign-off | Publish the package to Drive as FINAL |
+| **03 Bank Transactions** | QBO "For Review" feed with `PAYPAL *INST XFER` lines and QBO's guessed categories; PayPal CSV with BOM; Square/Amazon receipts; ECB rates; SOWs; run sheets | Triage which lines lack context, **simulated PayPal/receipt lookup**, subset-sum match to the cent, FX at ECB plus PayPal spread, prepaid vs expense, personal purchase policy, compare with QBO's guess | 5 categorized and split entries, plus 1 question (Zelle to "R Lopez"). Your answer becomes the memo |
+| **04 Evidence & Folders** | ~/Downloads: `Statement (3).pdf`, an identical `(1)` copy, last month's statement, recon reports, an unrelated budget PDF | Read each PDF's contents, classify it (statement or recon, account, last 4, period), dedupe by hash, drop the wrong period, cross-check recon to statement balance, learn the naming convention from August's Drive tree, check completeness | Filing plan into Drive with proper names, plus a manifest. 3 missing items flagged with the reason |
+| **05 Duplicate Vendors** | QBO vendor list (Anthropic / `ANTHROPIC PBC ` / Claude, Anysphere / Cursor, Google / Google Ads / Google Workspace, AWS, Splice.com, Lumen Crew vs Lumen Studios); Ramp suggested vendors; W-9 registry; transactions | Normalize, block, score evidence (TIN, domain, receipt issuer, W-9, product name), merge real duplicates, **keep look-alikes separate** (different TIN), show the spend impact, write prevention rules | 5 merges + Ramp→QBO mapping rules |
+
+Things to try in the demo:
+- Click any raw file to see the mess, with every cell a human would have to fix highlighted.
+- Click a pipeline stage to filter the log to that stage.
+- Expand a log line to see the data the agent acted on.
+- Press **"agent self-approve?"** on any proposal. It is denied in code, the denial is logged, and nothing changes.
+- Open **Audit trail** and click *Verify chain* to re-hash every row.
+
+Everything external (vendors, PayPal, QBO, Drive) is **simulated**, and the company data is synthetic. Regenerate it with `python -m jarvis.workbench.datagen`; the files live in `data/workbench/<problem>/raw/`. The original 3D "Synapse" close view is still at `/synapse`.
+
+---
+
 ## ★ The moment (what the demo video opens with)
 
 The September bank feed shows one line: `PAYPAL INST XFER DCE4343478 … −$3,912.44`. A rules-based bank feed books it as **"PayPal — Software Expense $3,912.44"**.

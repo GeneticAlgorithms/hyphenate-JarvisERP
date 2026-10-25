@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 ROLES: dict[str, dict[str, set[str]]] = {
     "sync":             {"work_item": {"create"}, "record": {"write"}},
-    "ai_agent":         {"work_item": {"propose", "ask", "revise", "dismiss"},
+    "ai_agent":         {"work_item": {"propose", "ask", "revise", "dismiss", "withdraw"},
                          "policy": {"propose"}, "message": {"send"}},
     "ai_reviewer":      {"work_item": {"review"}},
     "policy_engine":    {"work_item": {"approve"}},          # only under standing policy P-001 (checked below)

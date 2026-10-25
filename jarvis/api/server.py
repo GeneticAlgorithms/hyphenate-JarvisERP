@@ -66,7 +66,16 @@ def item_out(it: dict) -> dict:
 # ------------------------------------------------------------------ UI + SSE
 @app.get("/", response_class=HTMLResponse)
 def index():
-    return FileResponse(config.UI_DIR / "index.html")
+    return FileResponse(config.UI_DIR / "workbench.html")
+
+
+@app.get("/synapse", response_class=HTMLResponse)
+def synapse():
+    return FileResponse(config.UI_DIR / "synapse.html")
+
+
+from jarvis.api.wb_routes import router as wb_router  # noqa: E402
+app.include_router(wb_router)
 
 
 app.mount("/ui", StaticFiles(directory=config.UI_DIR), name="ui")
