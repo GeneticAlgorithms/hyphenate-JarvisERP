@@ -126,7 +126,8 @@ class Run:
                 escalate: bool = False, question: str = "") -> str:
         # Apply materiality: amounts above threshold require higher scrutiny
         from jarvis.world import bible
-        materiality_cents = bible.BIBLE.get("materiality_cents", 50000)
+        from jarvis.money import fmt
+        materiality_cents = bible.APPROVAL_MATRIX.get("materiality_cents", 50000)
         total_cents = sum(abs(line.get("cents", 0)) for line in proposal.get("lines", []))
         if total_cents >= materiality_cents:
             original_conf = confidence

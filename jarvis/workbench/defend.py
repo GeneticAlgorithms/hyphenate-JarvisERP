@@ -168,7 +168,9 @@ def _address(question, it):
     elif challenge_type == "identity" or challenge_type == "purpose":
         return f"Confidence is {round((it.get('confidence') or 0) * 100)}% because each step below is backed by a source document."
     elif challenge_type == "amount":
-        total = sum(abs(l.get("cents", 0)) for l in lines)
+        # Sum only one side (debits or credits), not both
+        total = sum(l.get("cents", 0) for l in lines if l.get("cents", 0) != 0)
+        total = abs(total) // 2 if len([l for l in lines if l.get("cents", 0) != 0]) > 1 else abs(total)
         return f"Total {fmt(total)} ties to source documents. Each line is computed from receipts/contracts, not estimated."
     else:
         return "Here is what the decision rests on."
