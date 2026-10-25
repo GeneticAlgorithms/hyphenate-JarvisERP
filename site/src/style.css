@@ -1678,26 +1678,60 @@ h3 { font-size: 1.75rem; margin-bottom: 1rem; }
   letter-spacing: -0.01em;
 }
 
-/* Present Mode Slide Layouts */
-.present-slide-hero {
-  text-align: center;
+/* Present Mode Slide Layouts - Hand-built 16:9 templates */
+.slide-content {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   min-height: 70vh;
   padding: var(--space-xl);
+  text-align: center;
 }
 
-.present-eyebrow {
-  font: 700 12px var(--sans);
+.slide-heading {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--maroon);
+  margin-bottom: var(--space-lg);
+  letter-spacing: -0.02em;
+}
+
+.slide-subheading {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--maroon);
+  margin: var(--space-xl) 0 var(--space-lg);
+}
+
+.slide-note {
+  font-size: 1.1rem;
+  color: var(--ink2);
+  margin-top: var(--space-lg);
+  font-style: italic;
+}
+
+.slide-label {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--ink2);
+  margin: var(--space-md) 0;
+}
+
+/* Slide 1: Hero */
+.slide-hero {
+  text-align: center;
+}
+
+.slide-eyebrow {
+  font: 700 13px var(--sans);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--orange);
   margin-bottom: var(--space-lg);
 }
 
-.present-title {
+.slide-title {
   font-size: 4rem;
   line-height: 1.1;
   margin-bottom: var(--space-lg);
@@ -1707,61 +1741,520 @@ h3 { font-size: 1.75rem; margin-bottom: 1rem; }
   background-clip: text;
 }
 
-.present-subtitle {
-  font-size: 1.35rem;
+.slide-subtitle {
+  font-size: 1.4rem;
   line-height: 1.7;
   color: var(--ink2);
-  max-width: 900px;
-}
-
-.present-glossary {
-  text-align: center;
-  padding: var(--space-xl);
-}
-
-.present-glossary h2 {
-  margin-bottom: var(--space-md);
-}
-
-.present-glossary p {
-  font-size: 1.2rem;
-  color: var(--ink2);
-  margin-bottom: var(--space-xl);
-}
-
-.glossary-sample {
-  max-width: 900px;
+  max-width: 950px;
   margin: 0 auto;
 }
 
-.sample-grid {
+/* Slide 2: Moment - 4 split cards */
+.slide-moment {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.slide-bank-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: var(--space-lg) var(--space-xl);
+  margin: var(--space-lg) 0;
+  font-family: var(--mono);
+  box-shadow: var(--shadow-md);
+}
+
+.slide-bank-line .date {
+  font-size: 14px;
+  color: var(--ink2);
+  font-weight: 600;
+}
+
+.slide-bank-line .desc {
+  font-size: 15px;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.slide-bank-line .amount {
+  font-size: 20px;
+  color: var(--red);
+  font-weight: 700;
+}
+
+.slide-split-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-lg);
+  margin: var(--space-xl) 0;
+}
+
+.slide-card {
+  background: linear-gradient(135deg, rgba(250, 102, 16, 0.15), rgba(250, 102, 16, 0.08));
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(250, 102, 16, 0.3);
+  border-radius: 20px;
+  padding: var(--space-lg);
+  text-align: left;
+  box-shadow: 0 8px 32px rgba(250, 102, 16, 0.2);
+}
+
+.card-amount {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--maroon);
+  margin-bottom: var(--space-sm);
+}
+
+.card-account {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--orange);
+  margin-bottom: var(--space-xs);
+}
+
+.card-detail {
+  font-size: 15px;
+  color: var(--ink2);
+  line-height: 1.5;
+}
+
+.slide-total {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--green);
+  margin-top: var(--space-lg);
+}
+
+/* Slide 3: Company */
+.slide-company {
+  max-width: 900px;
+}
+
+.slide-company-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: var(--space-xl);
+  margin: var(--space-lg) 0;
+  box-shadow: var(--shadow-md);
+}
+
+.company-emoji {
+  font-size: 4rem;
+  margin-bottom: var(--space-md);
+}
+
+.slide-company-card h3 {
+  font-size: 1.75rem;
+  margin-bottom: var(--space-md);
+}
+
+.slide-company-card p {
+  font-size: 1.2rem;
+  color: var(--ink2);
+  line-height: 1.7;
+}
+
+.slide-seats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-lg);
+  margin-top: var(--space-lg);
+}
+
+.slide-seat {
+  background: linear-gradient(135deg, var(--maroon), #5f0f0f);
+  border-radius: 16px;
+  padding: var(--space-xl);
+  color: #fff;
+  box-shadow: var(--shadow-lg);
+}
+
+.seat-name {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: rgba(250, 102, 16, 0.95);
+  margin-bottom: var(--space-sm);
+}
+
+.seat-duties {
+  font-size: 1.1rem;
+  line-height: 1.6;
+  opacity: 0.95;
+}
+
+/* Slide 4: Three Systems */
+.slide-systems {
+  max-width: 1100px;
+}
+
+.slide-systems-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-md);
+  margin: var(--space-xl) 0;
+}
+
+.slide-system-box {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  border: 2px solid var(--line);
+  border-radius: 20px;
+  padding: var(--space-xl);
+  min-width: 250px;
+  box-shadow: var(--shadow-md);
+}
+
+.system-label {
+  font: 700 12px var(--sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--orange);
+  margin-bottom: var(--space-sm);
+}
+
+.system-value {
+  font: 700 2rem var(--sans);
+  color: var(--maroon);
+  margin-bottom: var(--space-xs);
+}
+
+.system-desc {
+  font-size: 14px;
+  color: var(--ink2);
+}
+
+.slide-connector {
+  font-size: 3rem;
+  color: var(--red);
+  font-weight: 700;
+}
+
+/* Slide 5: Five Problems */
+.slide-problems {
+  max-width: 1200px;
+}
+
+.slide-problems-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: var(--space-lg);
+  margin: var(--space-xl) 0;
 }
 
-.sample-term {
+.slide-problem {
   background: var(--glass-bg);
   backdrop-filter: blur(12px);
   border: 1px solid var(--line);
   border-radius: 16px;
   padding: var(--space-lg);
-  font-size: 1.1rem;
-  line-height: 1.6;
+  text-align: left;
   box-shadow: var(--shadow-sm);
 }
 
-.sample-term strong {
-  color: var(--maroon);
+.problem-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, var(--orange), #ff7a2e);
+  color: #fff;
+  border-radius: 50%;
   font-weight: 700;
+  font-size: 18px;
+  margin-bottom: var(--space-md);
+  box-shadow: 0 4px 16px rgba(250, 102, 16, 0.3);
 }
 
-.present-problems-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-  gap: var(--space-lg);
+.problem-name {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--maroon);
+  margin-bottom: var(--space-sm);
+}
+
+.problem-ex {
+  font-size: 14px;
+  color: var(--ink2);
+  line-height: 1.6;
+}
+
+/* Slide 6: Challenges */
+.slide-challenges {
   max-width: 1200px;
-  margin: 0 auto;
+}
+
+.slide-challenges-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-lg);
+  margin: var(--space-xl) 0;
+}
+
+.slide-challenge-item {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: var(--space-lg);
+  text-align: left;
+  box-shadow: var(--shadow-sm);
+}
+
+.challenge-name {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--orange);
+  margin-bottom: var(--space-xs);
+}
+
+.challenge-q {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--maroon);
+  margin-bottom: var(--space-sm);
+}
+
+.challenge-a {
+  font-size: 14px;
+  color: var(--ink2);
+  line-height: 1.6;
+}
+
+/* Slide 7: Architecture Stack */
+.slide-architecture {
+  max-width: 1000px;
+}
+
+.slide-arch-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  margin: var(--space-xl) 0;
+}
+
+.slide-arch-layer {
+  background: linear-gradient(135deg, rgba(250, 102, 16, 0.15), rgba(250, 102, 16, 0.08));
+  border: 1px solid rgba(250, 102, 16, 0.3);
+  border-radius: 16px;
+  padding: var(--space-lg) var(--space-xl);
+  text-align: left;
+  box-shadow: 0 4px 16px rgba(250, 102, 16, 0.15);
+  opacity: calc(0.7 + var(--layer) * 0.1);
+}
+
+.arch-layer-label {
+  font: 700 13px var(--sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--maroon);
+  margin-bottom: var(--space-xs);
+}
+
+.arch-layer-items {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* Slide 8: Double Entry Balance */
+.slide-balance {
+  max-width: 1100px;
+}
+
+.slide-balance-demo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xl);
+  margin: var(--space-xl) 0;
+}
+
+.balance-side {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  border: 2px solid var(--line);
+  border-radius: 20px;
+  padding: var(--space-xl);
+  min-width: 350px;
+  box-shadow: var(--shadow-md);
+}
+
+.balance-label {
+  font: 700 14px var(--sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--orange);
+  margin-bottom: var(--space-md);
+  text-align: center;
+}
+
+.balance-entries {
+  margin-bottom: var(--space-md);
+}
+
+.balance-entry {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--ink);
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--mono);
+}
+
+.balance-sum {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--maroon);
+  text-align: center;
+  padding-top: var(--space-md);
+  border-top: 2px solid var(--maroon);
+}
+
+.balance-pivot {
+  font-size: 4rem;
+  color: var(--orange);
+}
+
+/* Slide 9: Trust & Audit */
+.slide-trust {
+  max-width: 1100px;
+}
+
+.slide-trust-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-lg);
+  margin: var(--space-xl) 0;
+}
+
+.slide-trust-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: var(--space-lg);
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+}
+
+.trust-icon {
+  font-size: 3rem;
+  margin-bottom: var(--space-md);
+}
+
+.trust-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--maroon);
+  margin-bottom: var(--space-sm);
+}
+
+.trust-desc {
+  font-size: 15px;
+  color: var(--ink2);
+  margin-bottom: var(--space-sm);
+  line-height: 1.5;
+}
+
+.trust-rule {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--orange);
+}
+
+.slide-audit-note {
+  background: linear-gradient(135deg, rgba(122, 20, 20, 0.12), rgba(122, 20, 20, 0.08));
+  border: 1px solid rgba(122, 20, 20, 0.2);
+  border-radius: 12px;
+  padding: var(--space-lg);
+  margin-top: var(--space-xl);
+  font-size: 15px;
+  color: var(--ink);
+  line-height: 1.6;
+  text-align: left;
+}
+
+/* Slide 10: Proof */
+.slide-proof {
+  max-width: 1100px;
+}
+
+.slide-proof-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-lg);
+  margin: var(--space-xl) 0;
+}
+
+.slide-proof-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  border: 2px solid var(--line);
+  border-radius: 20px;
+  padding: var(--space-xl);
+  box-shadow: var(--shadow-md);
+}
+
+.proof-label {
+  font: 700 12px var(--sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--orange);
+  margin-bottom: var(--space-md);
+}
+
+.proof-score {
+  font-size: 3.5rem;
+  font-weight: 700;
+  color: var(--maroon);
+  margin-bottom: var(--space-sm);
+  line-height: 1;
+}
+
+.proof-desc {
+  font-size: 14px;
+  color: var(--ink2);
+  line-height: 1.5;
+}
+
+/* Slide 11: Glossary */
+.slide-glossary {
+  max-width: 1100px;
+}
+
+.slide-glossary-highlights {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-md);
+  margin: var(--space-xl) 0;
+  text-align: left;
+}
+
+.glossary-term {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: var(--space-md) var(--space-lg);
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+
+.glossary-term strong {
+  color: var(--maroon);
+  font-weight: 700;
 }
 
 .exit-btn {

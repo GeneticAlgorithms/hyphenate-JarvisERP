@@ -590,98 +590,323 @@ function initPresentMode() {
   const autoplay = urlParams.get('autoplay') === '1';
   const duration = parseInt(urlParams.get('dur') || '8') * 1000;
 
-  // Define purpose-built slides with 16:9 layouts
+  // Define hand-built slides with 16:9 layouts (1920x1080 / 1280x800 compatible)
   const slides = [
+    // Slide 1: Hero
     {
-      title: 'JarvisERP',
+      title: 'Hero',
       render: () => `
-        <div class="present-slide-hero">
-          <div class="present-eyebrow">Cal Hacks 2026 · Hyphenate Track</div>
-          <h1 class="present-title">An autonomous Staff Accountant<br>you could actually hire</h1>
-          <p class="present-subtitle">JarvisERP fills Afterglow Labs' Staff Accountant and Vendor-Master seats.<br>
+        <div class="slide-content slide-hero">
+          <div class="slide-eyebrow">Cal Hacks 2026 · Hyphenate Track</div>
+          <h1 class="slide-title">An autonomous Staff Accountant<br>you could actually hire</h1>
+          <p class="slide-subtitle">JarvisERP fills Afterglow Labs' Staff Accountant and Vendor-Master seats.<br>
           It reconciles three systems that never agree, books accruals, keeps vendors deduplicated—<br>
           and cannot pass anything to humans without Controller hash-approval.</p>
         </div>
       `
     },
+    // Slide 2: The Moment - 4 split cards
     {
       title: 'The Moment',
-      render: () => {
-        const moment = document.querySelector('#moment .moment-content');
-        return moment ? moment.innerHTML : '<p>Moment content</p>';
-      }
+      render: () => `
+        <div class="slide-content slide-moment">
+          <h2 class="slide-heading">One bank line, four transactions to the cent</h2>
+          <div class="slide-bank-line">
+            <span class="date">09/18</span>
+            <span class="desc">PAYPAL *INST XFER DCE4343478</span>
+            <span class="amount">-$3,912.44</span>
+          </div>
+          <p class="slide-label">Jarvis decomposes the line:</p>
+          <div class="slide-split-cards">
+            <div class="slide-card">
+              <div class="card-amount">$3,451.50</div>
+              <div class="card-account">1310 · Prepaid Tour Costs</div>
+              <div class="card-detail">Kraftwerk Rigging · Berlin Nov 14 · €2,950 @ 1.1700</div>
+            </div>
+            <div class="slide-card">
+              <div class="card-amount">$147.50</div>
+              <div class="card-account">6810 · Bank & FX Fees</div>
+              <div class="card-detail">PayPal spread · 1.2200 vs 1.1700</div>
+            </div>
+            <div class="slide-card">
+              <div class="card-amount">$200.00</div>
+              <div class="card-account">6410 · Software</div>
+              <div class="card-detail">Anthropic (alias "Claude")</div>
+            </div>
+            <div class="slide-card">
+              <div class="card-amount">$113.44</div>
+              <div class="card-account">1250 · Employee Receivable</div>
+              <div class="card-detail">J. Ortiz · Steam · Policy P-0317</div>
+            </div>
+          </div>
+          <div class="slide-total">Total: $3,912.44 ✓</div>
+        </div>
+      `
     },
+    // Slide 3: Company & Seats
     {
       title: 'Afterglow Labs',
-      render: () => {
-        const company = document.querySelector('#company .company-content');
-        return company ? company.innerHTML : '<p>Company content</p>';
-      }
+      render: () => `
+        <div class="slide-content slide-company">
+          <h2 class="slide-heading">Afterglow Labs — where accounting gets messy</h2>
+          <div class="slide-company-card">
+            <div class="company-emoji">🎵</div>
+            <h3>Audio-Visual Touring Studio</h3>
+            <p>28-person Bay Area studio producing live-visual shows for festivals and clubs.</p>
+          </div>
+          <h3 class="slide-subheading">Seats Jarvis Fills</h3>
+          <div class="slide-seats">
+            <div class="slide-seat">
+              <div class="seat-name">Staff Accountant</div>
+              <div class="seat-duties">Cash & expense close, reconciliation, accruals</div>
+            </div>
+            <div class="slide-seat">
+              <div class="seat-name">Vendor-Master Clerk</div>
+              <div class="seat-duties">Deduplicate vendors, maintain canonical list</div>
+            </div>
+          </div>
+        </div>
+      `
     },
+    // Slide 4: Three Systems
     {
       title: 'Three Systems',
-      render: () => {
-        const systems = document.querySelector('#systems .systems-content');
-        return systems ? systems.innerHTML : '<p>Systems content</p>';
-      }
+      render: () => `
+        <div class="slide-content slide-systems">
+          <h2 class="slide-heading">Three systems that never agree</h2>
+          <div class="slide-systems-row">
+            <div class="slide-system-box">
+              <div class="system-label">Bank Feed</div>
+              <div class="system-value">$3,912.44</div>
+              <div class="system-desc">"PAYPAL INST XFER"</div>
+            </div>
+            <div class="slide-connector">✗</div>
+            <div class="slide-system-box">
+              <div class="system-label">Ledger (QBO)</div>
+              <div class="system-value">$3,912.44</div>
+              <div class="system-desc">"Software Expense"</div>
+            </div>
+            <div class="slide-connector">✗</div>
+            <div class="slide-system-box">
+              <div class="system-label">PayPal Detail</div>
+              <div class="system-value">4 payments</div>
+              <div class="system-desc">€2,950 + $147.50 + $200 + $113.44</div>
+            </div>
+          </div>
+          <p class="slide-note">Jarvis reconciles all three, books correct accounts & vendors</p>
+        </div>
+      `
     },
+    // Slide 5: Five Problems
     {
       title: 'Five Problems',
-      render: () => {
-        const problems = document.querySelector('#problems .problems-grid');
-        return problems ? `<div class="present-problems-grid">${problems.innerHTML}</div>` : '<p>Problems</p>';
-      }
+      render: () => `
+        <div class="slide-content slide-problems">
+          <h2 class="slide-heading">What an accountant faces every close</h2>
+          <div class="slide-problems-grid">
+            <div class="slide-problem">
+              <div class="problem-num">01</div>
+              <div class="problem-name">Timing & Accruals</div>
+              <div class="problem-ex">Interest earned Sep 30, deposited Oct 1</div>
+            </div>
+            <div class="slide-problem">
+              <div class="problem-num">02</div>
+              <div class="problem-name">Roll-forward</div>
+              <div class="problem-ex">New GL account mid-year breaks Excel</div>
+            </div>
+            <div class="slide-problem">
+              <div class="problem-num">03</div>
+              <div class="problem-name">Vague Bank Lines</div>
+              <div class="problem-ex">Bank says "PAYPAL" — what was bought?</div>
+            </div>
+            <div class="slide-problem">
+              <div class="problem-num">04</div>
+              <div class="problem-name">Evidence & Folders</div>
+              <div class="problem-ex">Downloads: Statement (3).pdf duplicate mess</div>
+            </div>
+            <div class="slide-problem">
+              <div class="problem-num">05</div>
+              <div class="problem-name">Duplicate Vendors</div>
+              <div class="problem-ex">Ramp suggests "Claude" but QBO has "Anthropic"</div>
+            </div>
+          </div>
+        </div>
+      `
     },
+    // Slide 6: Challenges
     {
       title: 'Challenges',
-      render: () => {
-        const challenges = document.querySelector('#challenges .challenges-content');
-        return challenges ? challenges.innerHTML : '<p>Challenges</p>';
-      }
+      render: () => `
+        <div class="slide-content slide-challenges">
+          <h2 class="slide-heading">Five forces that test autonomous agents</h2>
+          <div class="slide-challenges-grid">
+            <div class="slide-challenge-item">
+              <div class="challenge-name">Trust</div>
+              <div class="challenge-q">Can we trust it?</div>
+              <div class="challenge-a">Hash-chained audit log, single gateway, role enforcement</div>
+            </div>
+            <div class="slide-challenge-item">
+              <div class="challenge-name">Correctness</div>
+              <div class="challenge-q">Is it right?</div>
+              <div class="challenge-a">Simulation harness, 92% match on real data</div>
+            </div>
+            <div class="slide-challenge-item">
+              <div class="challenge-name">Evidence</div>
+              <div class="challenge-q">Can it cite sources?</div>
+              <div class="challenge-a">Every entry links SOWs, policies, Drive files</div>
+            </div>
+            <div class="slide-challenge-item">
+              <div class="challenge-name">Governance</div>
+              <div class="challenge-q">Who approves?</div>
+              <div class="challenge-a">Controller must hash-sign; no self-approval</div>
+            </div>
+            <div class="slide-challenge-item">
+              <div class="challenge-name">Change</div>
+              <div class="challenge-q">Does it learn?</div>
+              <div class="challenge-a">Policies from rulings; vendors evolve</div>
+            </div>
+          </div>
+        </div>
+      `
     },
+    // Slide 7: Architecture
     {
       title: 'Architecture',
-      render: () => {
-        const arch = document.querySelector('#architecture .iso-stack');
-        return arch ? `<div style="transform: scale(0.85);">${arch.outerHTML}</div>` : '<p>Architecture</p>';
-      }
+      render: () => `
+        <div class="slide-content slide-architecture">
+          <h2 class="slide-heading">System Architecture Stack</h2>
+          <div class="slide-arch-stack">
+            <div class="slide-arch-layer" style="--layer: 0;">
+              <div class="arch-layer-label">Source Systems</div>
+              <div class="arch-layer-items">Chase · PayPal · Ramp · Gusto · Drive</div>
+            </div>
+            <div class="slide-arch-layer" style="--layer: 1;">
+              <div class="arch-layer-label">ERP / QuickBooks</div>
+              <div class="arch-layer-items">GL · AP/AR · Vendor Master</div>
+            </div>
+            <div class="slide-arch-layer" style="--layer: 2;">
+              <div class="arch-layer-label">Jarvis System of Work</div>
+              <div class="arch-layer-items">Work Items · Evidence · Policies</div>
+            </div>
+            <div class="slide-arch-layer" style="--layer: 3;">
+              <div class="arch-layer-label">Controls & Gateway</div>
+              <div class="arch-layer-items">Single Gateway · Roles · Audit Chain</div>
+            </div>
+            <div class="slide-arch-layer" style="--layer: 4;">
+              <div class="arch-layer-label">People & Outputs</div>
+              <div class="arch-layer-items">Controller · Auditor · Financial Package</div>
+            </div>
+          </div>
+          <p class="slide-note">Transaction packets flow upward; Gateway validates every write</p>
+        </div>
+      `
     },
+    // Slide 8: Double Entry
     {
       title: 'Double Entry',
-      render: () => {
-        const balance = document.querySelector('#balance .balance-content');
-        return balance ? balance.innerHTML : '<p>Balance</p>';
-      }
+      render: () => `
+        <div class="slide-content slide-balance">
+          <h2 class="slide-heading">Every entry balances</h2>
+          <div class="slide-balance-demo">
+            <div class="balance-side">
+              <div class="balance-label">Debits</div>
+              <div class="balance-entries">
+                <div class="balance-entry">1310 Prepaid $3,451.50</div>
+                <div class="balance-entry">6810 Fees $147.50</div>
+                <div class="balance-entry">6410 Software $200.00</div>
+                <div class="balance-entry">1250 Receivable $113.44</div>
+              </div>
+              <div class="balance-sum">$3,912.44</div>
+            </div>
+            <div class="balance-pivot">⚖</div>
+            <div class="balance-side">
+              <div class="balance-label">Credits</div>
+              <div class="balance-entries">
+                <div class="balance-entry">1010 Cash $3,912.44</div>
+              </div>
+              <div class="balance-sum">$3,912.44</div>
+            </div>
+          </div>
+          <p class="slide-note">✓ Balanced to the cent — every transaction, every time</p>
+        </div>
+      `
     },
+    // Slide 9: Trust & Audit
     {
       title: 'Trust & Limits',
-      render: () => {
-        const trust = document.querySelector('#trust .trust-content');
-        return trust ? trust.innerHTML : '<p>Trust</p>';
-      }
+      render: () => `
+        <div class="slide-content slide-trust">
+          <h2 class="slide-heading">Trust & Limits</h2>
+          <div class="slide-trust-row">
+            <div class="slide-trust-card">
+              <div class="trust-icon">👤</div>
+              <div class="trust-title">Controller</div>
+              <div class="trust-desc">Approves/rejects proposals</div>
+              <div class="trust-rule">Can write journal entries</div>
+            </div>
+            <div class="slide-trust-card">
+              <div class="trust-icon">🤖</div>
+              <div class="trust-title">Jarvis</div>
+              <div class="trust-desc">Proposes entries & evidence</div>
+              <div class="trust-rule">Cannot write without approval</div>
+            </div>
+            <div class="slide-trust-card">
+              <div class="trust-icon">🔍</div>
+              <div class="trust-title">Auditor</div>
+              <div class="trust-desc">Reads everything, writes nothing</div>
+              <div class="trust-rule">Asks "why?"</div>
+            </div>
+          </div>
+          <div class="slide-audit-note">
+            <strong>Hash-Chained Audit Log:</strong> Every write hashes the previous block.
+            Tampering breaks the chain forward.
+          </div>
+        </div>
+      `
     },
+    // Slide 10: Proof
     {
       title: 'Proof',
-      render: () => {
-        const proof = document.querySelector('#proof .proof-content');
-        return proof ? proof.innerHTML : '<p>Proof</p>';
-      }
+      render: () => `
+        <div class="slide-content slide-proof">
+          <h2 class="slide-heading">Proof: Real vs Simulation</h2>
+          <div class="slide-proof-grid">
+            <div class="slide-proof-card">
+              <div class="proof-label">Correctness</div>
+              <div class="proof-score">92%</div>
+              <div class="proof-desc">Match on 134 real transactions</div>
+            </div>
+            <div class="slide-proof-card">
+              <div class="proof-label">Speed</div>
+              <div class="proof-score">&lt;1s</div>
+              <div class="proof-desc">Per transaction, including evidence fetch</div>
+            </div>
+            <div class="slide-proof-card">
+              <div class="proof-label">Audit Coverage</div>
+              <div class="proof-score">100%</div>
+              <div class="proof-desc">Every write logged & hash-chained</div>
+            </div>
+          </div>
+          <p class="slide-note">Simulation harness replays real transactions, measures delta</p>
+        </div>
+      `
     },
+    // Slide 11: Glossary
     {
       title: 'Glossary',
       render: () => `
-        <div class="present-glossary">
-          <h2>30+ Accounting Terms</h2>
-          <p>Interactive flip cards covering fundamentals, systems, accounts, timing, and processes.</p>
-          <div class="glossary-sample">
-            <div class="sample-grid">
-              <div class="sample-term"><strong>Debit</strong> — Left side of entry</div>
-              <div class="sample-term"><strong>Credit</strong> — Right side of entry</div>
-              <div class="sample-term"><strong>Accrual</strong> — Record when earned</div>
-              <div class="sample-term"><strong>Prepaid</strong> — Future benefit asset</div>
-              <div class="sample-term"><strong>Journal Entry</strong> — Balanced transaction</div>
-              <div class="sample-term"><strong>Reconcile</strong> — Prove sources agree</div>
-            </div>
+        <div class="slide-content slide-glossary">
+          <h2 class="slide-heading">30+ Accounting Terms</h2>
+          <p class="slide-subtitle">Interactive flip cards on the main site</p>
+          <div class="slide-glossary-highlights">
+            <div class="glossary-term"><strong>Debit:</strong> Left side of entry (↑ assets/expenses)</div>
+            <div class="glossary-term"><strong>Credit:</strong> Right side of entry (↑ liabilities/equity)</div>
+            <div class="glossary-term"><strong>Accrual:</strong> Record when earned, not when cash moves</div>
+            <div class="glossary-term"><strong>Prepaid:</strong> Cash paid now, benefit later (asset)</div>
+            <div class="glossary-term"><strong>Journal Entry:</strong> Balanced debits & credits</div>
+            <div class="glossary-term"><strong>Reconcile:</strong> Prove two sources agree</div>
+            <div class="glossary-term"><strong>Subledger:</strong> Detailed records rolling up to GL</div>
+            <div class="glossary-term"><strong>Cut-off:</strong> Transactions in correct period</div>
           </div>
         </div>
       `
@@ -701,20 +926,19 @@ function initPresentMode() {
     // Render the slide
     slideContainer.innerHTML = slide.render();
     
-    // Animate elements in
-    const elements = slideContainer.querySelectorAll('*');
-    elements.forEach(el => {
-      el.style.opacity = '1';
-      el.style.transform = 'none';
-    });
+    // Create GSAP timeline for slide entrance
+    const tl = gsap.timeline();
     
-    gsap.from(slideContainer.children, {
-      opacity: 0,
-      y: 20,
-      duration: 0.5,
-      stagger: 0.08,
-      ease: 'power2.out'
-    });
+    const children = slideContainer.children[0]?.children || [];
+    if (children.length > 0) {
+      tl.from(children, {
+        opacity: 0,
+        y: 30,
+        duration: 0.6,
+        stagger: 0.1,
+        ease: 'power2.out'
+      });
+    }
     
     updateSlideCounter();
   };
