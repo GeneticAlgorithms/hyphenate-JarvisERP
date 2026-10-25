@@ -153,7 +153,13 @@ def test_live() -> dict:
     
     if not available():
         _llm_test_result = False
-        return {"status": "fallback", "tested": True, "reason": "no API key", "cached": False}
+        import os
+        llm_env = os.getenv("JARVIS_LLM", "").lower()
+        if llm_env in ("off", "false", "0", "no"):
+            reason = "LLM disabled (JARVIS_LLM=off)"
+        else:
+            reason = "no API key"
+        return {"status": "fallback", "tested": True, "reason": reason, "cached": False}
     
     try:
         models = _select_models()
