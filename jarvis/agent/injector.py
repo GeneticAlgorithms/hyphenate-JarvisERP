@@ -45,319 +45,144 @@ TEMPLATES = {
 }
 
 
-def _parse_amount(text: str) -> float | None:
-    """Extract dollar amount, supporting k/m suffixes and avoiding date confusion."""
-    # Try $50k, $12m format first
-    m = re.search(r'\$\s?([\d,]+(?:\.\d+)?)\s*([km])\b', text.lower())
-    if m:
-        base = float(m.group(1).replace(",", ""))
-        mult = {"k": 1000, "m": 1000000}[m.group(2)]
-        return base * mult
+def parse(text: str) -> tuple[str, dict]:
+    """Parse free text into scenario template and parameters. Extract real values from text."""
+    if llm.available():
+        out = llm.complete_json(
+            "Extract finance scenario details from user text. Return JSON with: template (one of: unknown_debit, "
+            "personal_card, duplicate_bill, invoice_over_accrual, paypal_bundle, vendor_bank_change, split_purchases, "
+            "ghost_vendor, refund_as_revenue), params (object with: amount in dollars as number, merchant/vendor name "
+            "as written, date YYYY-MM-DD in Sept 2026 unless Oct specified, cardholder name if mentioned). "
+            "Extract merchant/vendor name EXACTLY as user typed it.",
+            f"User scenario: {text}")
+        if out and out.get("template") in TEMPLATES:
+            # Use LLM-extracted params, fallback to template defaults
+            return out["template"], {**TEMPLATES[out["template"]]["params"], **(out.get("params") or {})}
     
-    # Regular $X,XXX.XX format - but avoid dates like $96 when followed by date-like context
-    matches = re.findall(r'\$\s?([\d,]+(?:\.\d{1,2})?)', text)
-    if matches:
-        # Filter out likely dates (single/double digit followed by date context)
-        for amt_str in matches:
-            amt = float(amt_str.replace(",", ""))
-            # Skip if it looks like a date (e.g., $96 could be 9/6)
-            if amt < 32 and re.search(rf'\${amt_str}\D{{0,2}}(on|at|/|,\s*20\d{{2}})', text):
-                continue
-            if amt >= 1:  # Reasonable amount
-                return amt
-    
-    # Try plain number with 'euros' or currency
-    m = re.search(r'\b([\d,]+(?:\.\d+)?)\s*(euros?|eur|usd|dollars?)\b', text.lower())
-    if m:
-        return float(m.group(1).replace(",", ""))
-    
-    return None
-
-
-def _parse_date(text: str) -> str | None:
-    """Extract date from date-like tokens only."""
+    # Deterministic parsing: extract real parameters from text
     t = text.lower()
-    # Match M/D format
-    m = re.search(r'\b(9|10)/(0?[1-9]|[12]\d|3[01])\b', t)
-    if m:
-        month, day = int(m.group(1)), int(m.group(2))
-        return f"2026-{month:02d}-{day:02d}"
+    params = {}
     
-    # Match 'Sept 15', 'September 15' format
-    m = re.search(r'\b(sept|september|oct|october)\s+(\d{1,2})\b', t)
+    # Extract amount
+    m = re.search(r"\$\s?([\d,]+(?:\.\d{1,2})?)", text)
     if m:
-        month_map = {"sept": 9, "september": 9, "oct": 10, "october": 10}
-        month = month_map[m.group(1)]
-        day = int(m.group(2))
-        if 1 <= day <= 31:
-            return f"2026-{month:02d}-{day:02d}"
+        params["amount"] = float(m.group(1).replace(",", ""))
     
-    # Match YYYY-MM-DD format
-    m = re.search(r'\b(2026)-(09|10)-(\d{2})\b', t)
-    if m:
-        return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+    # Extract date (9/15, Sept 15, September 15)
+    dm = re.search(r"\b(9|10|sept|september|oct|october)\D{0,5}(\d{1,2})\b", t)
+    if dm:
+        month = {"9": 9, "10": 10, "sept": 9, "september": 9, "oct": 10, "october": 10}[dm.group(1)]
+        day = int(dm.group(2))
+        params["date"] = f"2026-{month:02d}-{day:02d}"
     
-    return None
+    # Extract merchant/vendor name from quotes or capitalized words
+    quoted = re.search(r'"([^"]{2,40})"', text) or re.search(r"'([^']{2,40})'", text)
+    if quoted:
+        params["merchant"] = quoted.group(1)
+        params["description"] = quoted.group(1).upper()
+        params["vendor"] = quoted.group(1)
+    else:
+        # Try to find capitalized merchant names
+        caps = re.findall(r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b', text)
+        if caps and not any(w in text for w in ["PayPal", "Ramp", "Bank"]):
+            params["merchant"] = caps[0]
+            params["description"] = caps[0].upper()
+            params["vendor"] = caps[0]
+    
+    # Extract cardholder name (handle "Maya's card" or "cardholder: J. Ortiz")
+    cardholder = re.search(r"([A-Z][a-z]+)'s card", text)
+    if cardholder:
+        # Map first names to full names from PEOPLE
+        first_name = cardholder.group(1).lower()
+        name_map = {
+            "maya": "Maya Chen",
+            "sam": "Sam Rivera", 
+            "lee": "Lee Okafor",
+            "dev": "Dev Patel"
+        }
+        params["cardholder"] = name_map.get(first_name, cardholder.group(1))
+    else:
+        cardholder = re.search(r'cardholder[:\s]+([A-Z]\.\s*[A-Z][a-z]+)', text)
+        if cardholder:
+            params["cardholder"] = cardholder.group(1)
+    
+    # Classify scenario type
+    if "paypal" in t:
+        k = "paypal_bundle"
+    elif "bank" in t and ("change" in t or "detail" in t or "fraud" in t or "vendor" in t):
+        k = "vendor_bank_change"
+    elif "split" in t or ("under" in t and ("threshold" in t or "limit" in t)) or re.search(r'(three|multiple|several)\s+.*\$[\d,]+.*charges', t):
+        k = "split_purchases"
+        # Extract number of charges and amounts
+        num_match = re.search(r'(three|four|five|six|2|3|4|5|6)\s+', t)
+        if num_match:
+            num_map = {"three": 3, "four": 4, "five": 5, "six": 6, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6}
+            params["count"] = num_map.get(num_match.group(1), 3)
+        # Extract multiple amounts if present (e.g., "$245, $235, $240")
+        amounts = re.findall(r'\$\s?([\d,]+(?:\.\d{1,2})?)', text)
+        if len(amounts) > 1:
+            params["amounts"] = [float(a.replace(",", "")) for a in amounts]
+            params["count"] = len(amounts)
+        # Extract approval limit if mentioned
+        limit_match = re.search(r'\$\s?([\d,]+(?:\.\d{1,2})?)\s+(?:approval\s+)?limit', t)
+        if limit_match:
+            params["approval_limit"] = float(limit_match.group(1).replace(",", ""))
+        # Extract source (Ramp/Chase/PayPal)
+        if "ramp" in t:
+            params["source"] = "Ramp"
+        elif "chase" in t:
+            params["source"] = "Chase"
+        elif "paypal" in t:
+            params["source"] = "PayPal"
+    elif "ghost" in t or ("vendor" in t and ("fake" in t or "doesn't exist" in t or "no record" in t)):
+        k = "ghost_vendor"
+    elif "refund" in t and "revenue" in t:
+        k = "refund_as_revenue"
+    elif "invoice" in t or ("bill" in t and ("more" in t or "over" in t or "higher" in t)):
+        k = "invoice_over_accrual"
+    elif "duplicate" in t or "twice" in t or "both" in t or "two bills" in t or "two invoices" in t:
+        k = "duplicate_bill"
+    elif any(w in t for w in ("personal", "nordstrom", "sephora", "steam", "gift", "makeup", "clothes")):
+        k = "personal_card"
+    else:
+        k = "unknown_debit"
+    
+    # Merge with template defaults, user params override
+    final_params = {**TEMPLATES[k]["params"], **params}
+    return k, final_params
+
+
+def _id(*parts) -> str:
+    """Generate unique ID including timestamp to avoid silent no-ops on repeated injects."""
+    timestamp = str(int(now().replace("T", "").replace(":", "").replace(".", "").replace("Z", "")[:14]))
+    return hashlib.md5((timestamp + "|" + "|".join(map(str, parts))).encode()).hexdigest()[:10].upper()
 
 
 def _match_vendor(name: str) -> dict | None:
-    """Fuzzy match vendor name against vendor master."""
+    """Fuzzy match vendor name against vendor master (e.g., 'Lumen Crew' -> 'Lumen Crew LLC')."""
     if not name:
         return None
     name_lower = name.lower().strip()
     for v in bible.VENDORS:
-        # Exact match
         if v["qbo_name"].lower() == name_lower:
             return v
-        # Partial match (e.g., "Lumen Crew" -> "Lumen Crew LLC")
         if name_lower in v["qbo_name"].lower() or v["qbo_name"].lower() in name_lower:
             return v
-        # Check legal name
         if name_lower in v.get("legal", "").lower():
             return v
     return None
 
 
-def _match_cardholder(text: str) -> str | None:
-    """Extract and match cardholder name (case-insensitive)."""
-    t_lower = text.lower()
-    
-    # Match "maya's card", "sam's card", etc. (case-insensitive)
-    for person_id, person in bible.PEOPLE.items():
-        first_name = person["name"].split()[0].lower()
-        if f"{first_name}'s card" in t_lower or f"{first_name} spent" in t_lower or f"{first_name} bought" in t_lower:
-            return person["name"]
-    
-    # Match "cardholder: J. Ortiz" format
-    m = re.search(r'cardholder[:\s]+([A-Z]\.\s*[A-Z][a-z]+)', text)
-    if m:
-        return m.group(1)
-    
-    return None
-
-
-def _parse_split_purchases(text: str) -> dict:
-    """Parse split purchase details, separating charges from limit."""
-    params = {}
-    t_lower = text.lower()
-    
-    # Parse word count (two to ten)
-    word_counts = {
-        "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
-        "seven": 7, "eight": 8, "nine": 9, "ten": 10,
-        "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9, "10": 10
-    }
-    for word, count in word_counts.items():
-        if re.search(rf'\b{word}\b', t_lower):
-            params["count"] = count
-            break
-    
-    # Extract ALL dollar amounts
-    all_amounts = []
-    for m in re.finditer(r'\$\s?([\d,]+(?:\.\d{1,2})?)\s*([km])?', text.lower()):
-        amt = float(m.group(1).replace(",", ""))
-        if m.group(2):
-            amt *= {"k": 1000, "m": 1000000}[m.group(2)]
-        all_amounts.append(amt)
-    
-    # Separate limit from charges
-    # Limit is typically mentioned with "limit", "threshold", "under", "below"
-    limit = None
-    limit_pattern = r'\$\s?([\d,]+(?:\.\d{1,2})?)\s*([km])?\s+(?:approval\s+)?(?:limit|threshold)'
-    m = re.search(limit_pattern, text.lower())
-    if m:
-        limit = float(m.group(1).replace(",", ""))
-        if m.group(2):
-            limit *= {"k": 1000, "m": 1000000}[m.group(2)]
-        params["approval_limit"] = limit
-        # Remove limit from charges
-        all_amounts = [a for a in all_amounts if abs(a - limit) > 0.01]
-    
-    # If we have charges, use them
-    if all_amounts:
-        if len(all_amounts) == 1:
-            # Single amount mentioned - split it by count
-            params["amount_each"] = all_amounts[0]
-        else:
-            # Multiple amounts - these are the individual charges
-            params["amounts"] = all_amounts
-            params["count"] = len(all_amounts)
-    
-    # Extract cardholder for split purchases
-    cardholder = _match_cardholder(text)
-    if cardholder:
-        params["cardholder"] = cardholder
-    
-    # Extract merchant (look for known vendors or "at X" pattern)
-    for v in bible.VENDORS:
-        if v["qbo_name"].lower() in t_lower:
-            params["merchant"] = v["qbo_name"]
-            break
-    
-    if "merchant" not in params:
-        # Try "at X" or "to X" pattern
-        m = re.search(r'\b(?:at|to)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)', text)
-        if m:
-            params["merchant"] = m.group(1)
-    
-    # Extract source
-    if "ramp" in t_lower:
-        params["source"] = "Ramp"
-    elif "chase" in t_lower:
-        params["source"] = "Chase"
-    
-    return params
-
-
-def parse(text: str) -> tuple[str, dict]:
-    """Parse free text into scenario template and parameters. NEVER INVENT FACTS."""
-    if not text or not text.strip():
-        return "needs_info", {"error": "empty_text"}
-    
-    t_lower = text.lower()
-    params = {}
-    params["_parser"] = "llm" if llm.available() else "deterministic"
-    
-    # Try LLM first if available
-    if llm.available():
-        try:
-            schema = {
-                "template": "one of: vendor_bank_change, split_purchases, ghost_vendor, refund_as_revenue, personal_card, duplicate_bill, invoice_over_accrual, paypal_bundle, unknown_debit, needs_info",
-                "vendor": "exact vendor name as mentioned, or null",
-                "merchant": "exact merchant name, or null",
-                "amount": "number in dollars (convert k/m suffixes), or null",
-                "amounts": "array of numbers if multiple amounts mentioned, or null",
-                "count": "number of charges/items, or null",
-                "limit": "approval limit amount if mentioned, or null",
-                "cardholder": "full employee name if mentioned, or null",
-                "date": "YYYY-MM-DD format in Sept/Oct 2026, or null",
-                "currency": "USD or EUR if mentioned, or null"
-            }
-            out = llm.complete_json(
-                f"Extract scenario details. Return JSON matching schema: {schema}. "
-                "Only extract facts explicitly stated. Use null for missing data.",
-                f"User text: {text}")
-            if out and out.get("template") in TEMPLATES:
-                params.update({k: v for k, v in out.items() if v is not None and k != "template"})
-                params["_parser"] = "llm"
-                return out["template"], params
-        except Exception:
-            pass  # Fall back to deterministic
-    
-    # Deterministic parsing - extract only what's clearly stated
-    amount = _parse_amount(text)
-    if amount:
-        params["amount"] = amount
-    
-    date = _parse_date(text)
-    if date:
-        params["date"] = date
-    
-    # Extract vendor/merchant from quotes or known vendors
-    quoted = re.search(r'["\']([^"\']{2,50})["\']', text)
-    if quoted:
-        vendor_name = quoted.group(1)
-        vendor = _match_vendor(vendor_name)
-        if vendor:
-            params["vendor"] = vendor["qbo_name"]
-        else:
-            params["vendor"] = vendor_name
-        params["merchant"] = vendor_name
-    else:
-        # Try to match against known vendors
-        for v in bible.VENDORS:
-            if v["qbo_name"].lower() in t_lower or v["legal"].lower() in t_lower:
-                params["vendor"] = v["qbo_name"]
-                params["merchant"] = v["qbo_name"]
-                break
-    
-    # Extract cardholder
-    cardholder = _match_cardholder(text)
-    if cardholder:
-        params["cardholder"] = cardholder
-    
-    # Classify scenario type based on keywords
-    if "bank" in t_lower and any(w in t_lower for w in ["change", "switch", "new account", "detail", "acct"]):
-        k = "vendor_bank_change"
-    elif "split" in t_lower or ("separate" in t_lower and "charges" in t_lower) or \
-         re.search(r'\b(two|three|four|five|six|2|3|4|5|6)\s+.*charges', t_lower):
-        k = "split_purchases"
-        params.update(_parse_split_purchases(text))
-    elif any(w in t_lower for w in ["no w-9", "w9", "po box", "upfront", "never heard", "doesn't exist", "address matches"]):
-        k = "ghost_vendor"
-    elif ("refund" in t_lower or "credit" in t_lower) and ("revenue" in t_lower or "income" in t_lower):
-        k = "refund_as_revenue"
-    elif "twice" in t_lower or "duplicate" in t_lower or ("paid" in t_lower and "again" in t_lower):
-        k = "duplicate_bill"
-    elif "accrued" in t_lower or "accrual" in t_lower:
-        k = "invoice_over_accrual"
-    elif "paypal" in t_lower and ("bundle" in t_lower or "eur" in t_lower or "euro" in t_lower):
-        k = "paypal_bundle"
-    elif any(w in t_lower for w in ["nordstrom", "sephora", "steam"]) or \
-         (cardholder and any(w in t_lower for w in ["spent", "bought", "purchase"])):
-        k = "personal_card"
-    elif "wire" in t_lower and ("in" in t_lower or "received" in t_lower or "got" in t_lower):
-        k = "incoming_wire"
-    elif "expense" in t_lower and ("boat" in t_lower or "ceo" in t_lower):
-        k = "needs_info"  # Off-topic
-    else:
-        k = "needs_info"  # Can't confidently classify
-    
-    # If we don't have key info for the scenario type, mark as needs_info
-    if k == "vendor_bank_change" and "vendor" not in params:
-        k = "needs_info"
-        params["missing"] = "vendor name"
-    elif k == "split_purchases" and "amount" not in params and "amounts" not in params:
-        k = "needs_info"
-        params["missing"] = "charge amounts"
-    elif k == "ghost_vendor" and "vendor" not in params:
-        k = "needs_info"
-        params["missing"] = "vendor name"
-    elif k == "refund_as_revenue" and "amount" not in params:
-        k = "needs_info"
-        params["missing"] = "refund amount"
-    
-    return k, params
-
-
-def _id(*parts) -> str:
-    return hashlib.md5("|".join(map(str, parts)).encode()).hexdigest()[:10].upper()
-
-
 def inject(session, text: str | None = None, template: str | None = None, params: dict | None = None) -> dict:
-    """Inject a judge scenario. NEVER INVENTS FACTS - creates needs_info if parsing fails."""
+    if text and not template:
+        template, params = parse(text)
+    params = {**TEMPLATES[template]["params"], **(params or {})}
     db, eng = session.db, session.engine
     created = []
     tag = uuid.uuid4().hex[:6]
-    
-    try:
-        if text and not template:
-            template, params = parse(text)
-        
-        if template not in TEMPLATES and template != "needs_info" and template != "incoming_wire":
-            # Unknown template - create needs_info
-            with db.tx():
-                append_audit(db, SYNC, "inject", f"scenario:unknown", False, 
-                            f"Unknown template '{template}' from text: {text}")
-            events.publish("inject_error", error="unknown_template", template=template, text=text)
-            return {"error": "unknown_template", "template": template, "text": text, "items": []}
-        
-        # Merge with defaults only if template is known
-        if template in TEMPLATES:
-            params = {**TEMPLATES[template]["params"], **(params or {})}
-        else:
-            params = params or {}
-        
-        with db.tx():
-            append_audit(db, SYNC, "inject", f"scenario:{template}", True, 
-                        f"judge scenario: {text or template} -> {params}")
-        events.publish("inject", template=template, params=params, text=text)
-    except Exception as e:
-        # Surface errors properly
-        with db.tx():
-            append_audit(db, SYNC, "inject", "error", False, f"Failed to parse: {e}")
-        events.publish("inject_error", error=str(e), text=text)
-        return {"error": str(e), "text": text, "items": []}
+    with db.tx():
+        append_audit(db, SYNC, "inject", f"scenario:{template}", True, f"judge scenario: {text or template} -> {params}")
+    events.publish("inject", template=template, params=params, text=text)
 
     if template == "unknown_debit":
         cents = -abs(to_cents(params["amount"]))
@@ -421,7 +246,23 @@ def inject(session, text: str | None = None, template: str | None = None, params
         for it, kind, payload in eng.discover_reviews(params["date"][:7]):
             created.append(eng.process_item(it, kind, payload))
     elif template == "invoice_over_accrual":
-        v = next(x for x in bible.VENDORS if x["qbo_name"] == params["vendor"])
+        v = _match_vendor(params.get("vendor", ""))
+        if not v:
+            # Vendor not found - create needs_info
+            anchor = f"inject:needs_info:{tag}"
+            it = create_item(db, SYNC, "judge_scenario", anchor,
+                            f"Judge scenario needs clarification: vendor '{params.get('vendor')}' not found",
+                            "2026-09", [])
+            question = f"Which vendor invoiced more than accrued? I couldn't find '{params.get('vendor')}' in the vendor master."
+            rationale = f"Vendor '{params.get('vendor')}' not found in vendor master for invoice-over-accrual scenario."
+            patch = {"question": question, "rationale": rationale, "injected": text or template}
+            it = transition(db, it["item_id"], "ask", JARVIS, patch, reason=rationale)
+            created.append(it)
+            created = [c for c in created if c]
+            return {"template": template, "params": params,
+                    "items": [{"item_id": c["item_id"], "state": c["state"], "kind": c["kind"], "title": c["title"],
+                              "rationale": c.get("rationale", "")} for c in created]}
+        
         cents = abs(to_cents(params["amount"]))
         bill_id = f"BILL-INJ-{tag}"
         bje = f"JE-INJB-{tag}"
@@ -443,56 +284,58 @@ def inject(session, text: str | None = None, template: str | None = None, params
     
     elif template == "vendor_bank_change":
         # Create work item for vendor bank detail change - MUST verify via callback before payment
-        v = next((x for x in bible.VENDORS if x["qbo_name"] == params["vendor"]), None)
-        if not v:
-            # Try to find vendor by partial name match
-            vendor_name = params.get("vendor", "")
-            for vendor in bible.VENDORS:
-                if vendor_name.lower() in vendor["qbo_name"].lower() or vendor["qbo_name"].lower() in vendor_name.lower():
-                    v = vendor
-                    break
+        v = _match_vendor(params.get("vendor", ""))
         
         if v:
             cents = int(params["amount"] * 100)
             d = params["date"]
             anchor = f"inject:bank_change:{tag}:{v['id']}"
-            it = create_item(db, SYNC, "vendor_bank_change", anchor, 
+            
+            # Check if email domain actually differs from vendor master
+            email_domain_mentioned = re.search(r'from\s+([a-z0-9.-]+\.[a-z]{2,})', text.lower()) if text else None
+            if email_domain_mentioned:
+                mentioned_domain = email_domain_mentioned.group(1)
+                domain_mismatch = mentioned_domain != v.get("domain", "")
+                domain_note = f"Email from {mentioned_domain} (vendor master shows {v.get('domain', 'N/A')})" if domain_mismatch else f"New bank details received by email"
+            else:
+                domain_note = "New bank details received by email"
+            
+            it = create_item(db, SYNC, "vendor_bank_change", anchor,
                             f"ALERT: {v['qbo_name']} bank details changed before ${params['amount']:.2f} payment",
-                            d[:7], [], 
-                            evidence=[{"type": "alert", "id": f"email-{tag}", "source": "email", 
-                                      "desc": f"Email from look-alike domain requesting bank change"}])
-            # Transition to NEEDS_INFO with evidence and requirement for callback
+                            d[:7], [],
+                            evidence=[{"type": "alert", "id": f"email-{tag}", "source": "email",
+                                      "desc": domain_note}])
+            
+            # Persist question and rationale in fields (not just audit reason)
+            question = f"BLOCK ${params['amount']:.2f} payment to {v['qbo_name']} pending verification. " + \
+                      f"{domain_note}. Verify via callback to phone on file: {v.get('phone', 'not listed')}. DO NOT PROCESS until verified."
+            
+            rationale = f"Vendor {v['qbo_name']} bank account change reported before ${params['amount']:.2f} payment. " + \
+                       f"Payment BLOCKED pending phone verification per fraud prevention policy."
+            
             patch = {
-                "alert": f"Vendor {v['qbo_name']} emailed new bank details before ${params['amount']:.2f} payment",
+                "question": question,
+                "rationale": rationale,
                 "vendor_id": v["id"],
                 "amount_cents": cents,
                 "date": d,
                 "requires": "callback_verification",
-                "phone_on_file": "vendor master phone",
+                "phone_on_file": v.get("phone", "vendor master"),
                 "email_domain": v.get("domain", ""),
-                "suspicious": True,
                 "injected": text or template
             }
-            it = transition(db, it["item_id"], "ask", JARVIS, patch, 
-                           reason=f"Bank detail change from look-alike domain before large payment - MUST verify via callback to {v['qbo_name']} phone on file before processing")
+            it = transition(db, it["item_id"], "ask", JARVIS, patch, reason=rationale[:300])
             created.append(it)
         else:
-            # Vendor not found, create generic alert
-            cents = int(params["amount"] * 100)
-            d = params.get("date", "2026-09-28")
-            anchor = f"inject:bank_change:{tag}:unknown"
-            it = create_item(db, SYNC, "vendor_bank_change", anchor,
-                            f"ALERT: Unknown vendor bank change before ${params['amount']:.2f} payment",
-                            d[:7], [])
-            patch = {
-                "alert": f"Bank detail change email for unknown vendor before ${params['amount']:.2f} payment",
-                "amount_cents": cents,
-                "date": d,
-                "requires": "verification",
-                "injected": text or template
-            }
-            it = transition(db, it["item_id"], "ask", JARVIS, patch,
-                           reason="Bank detail change for unknown vendor - must verify before any payment")
+            # Vendor not found - create needs_info
+            anchor = f"inject:needs_info:{tag}"
+            it = create_item(db, SYNC, "judge_scenario", anchor,
+                            f"Judge scenario needs clarification: vendor '{params.get('vendor')}' not found",
+                            "2026-09", [])
+            question = f"Which vendor's bank account changed? I couldn't find '{params.get('vendor')}' in the vendor master."
+            rationale = f"Vendor '{params.get('vendor')}' not found in vendor master for bank-change scenario."
+            patch = {"question": question, "rationale": rationale, "injected": text or template}
+            it = transition(db, it["item_id"], "ask", JARVIS, patch, reason=rationale)
             created.append(it)
     
     elif template == "split_purchases":
@@ -574,44 +417,60 @@ def inject(session, text: str | None = None, template: str | None = None, params
         d = params.get("date", "2026-09-22")
         
         # Check if vendor is in vendor master
-        v = next((x for x in bible.VENDORS if x["qbo_name"] == vendor_name), None)
+        v = _match_vendor(vendor_name)
         in_master = v is not None
         
-        # Check for employee address/bank match (simulated red flags)
+        # Build list of red flags from the text
         red_flags = []
+        t_lower = text.lower() if text else ""
+        
         if not in_master:
             red_flags.append("Not in vendor master")
-        red_flags.append("No W-9 on file")
-        red_flags.append("No SOW or contract")
+        if "no w-9" in t_lower or "w9" in t_lower or "w-9" in t_lower:
+            red_flags.append("No W-9 on file")
+        if "no sow" in t_lower or "no contract" in t_lower:
+            red_flags.append("No SOW or contract on file")
+        if "po box" in t_lower:
+            red_flags.append("Address is PO box")
+        if "upfront" in t_lower:
+            red_flags.append("Requests payment upfront")
+        if "never heard" in t_lower:
+            red_flags.append("Unknown vendor")
+        if "address matches" in t_lower or "employee" in t_lower:
+            red_flags.append("Address may match employee")
         
-        # Check if name/address might match an employee (simple heuristic)
-        for person_id, person in bible.PEOPLE.items():
-            if person["name"].split()[-1] in vendor_name or vendor_name.split()[0] in person["name"]:
-                red_flags.append(f"Name similarity to employee {person['name']}")
+        # If no specific flags, add generic ones
+        if not red_flags:
+            red_flags.append("Vendor verification required")
         
         anchor = f"inject:ghost:{tag}:{vendor_name.replace(' ', '_')}"
-        it = create_item(db, SYNC, "ghost_vendor", anchor, 
+        it = create_item(db, SYNC, "ghost_vendor", anchor,
                         f"BLOCK: Payment to '{vendor_name}' ${params['amount']:.2f} - vendor verification required",
                         d[:7], [],
                         evidence=[{"type": "alert", "id": f"ghost-{tag}", "source": "vendor_check",
                                   "desc": "; ".join(red_flags)}])
         
-        # Transition to NEEDS_INFO - payment is BLOCKED
+        # Persist question and rationale in fields
+        question = f"BLOCK ${params['amount']:.2f} payment to '{vendor_name}'. Red flags: {'; '.join(red_flags)}. " + \
+                  "Verify vendor legitimacy, obtain W-9 and contract before processing."
+        
+        rationale = f"Payment to '{vendor_name}' flagged for verification. {'; '.join(red_flags)}. " + \
+                   "Payment BLOCKED pending Controller approval per vendor onboarding policy."
+        
         patch = {
+            "question": question,
+            "rationale": rationale,
             "vendor_name": vendor_name,
             "amount_cents": cents,
             "date": d,
             "in_master": in_master,
-            "no_w9": True,
-            "no_sow": True,
             "red_flags": red_flags,
             "requires": "vendor_verification",
             "status": "BLOCKED",
             "escalate_to": "Controller",
             "injected": text or template
         }
-        it = transition(db, it["item_id"], "ask", JARVIS, patch,
-                       reason=f"BLOCKING ${params['amount']:.2f} payment to '{vendor_name}': " + "; ".join(red_flags) + ". Escalating to Controller for vendor verification")
+        it = transition(db, it["item_id"], "ask", JARVIS, patch, reason=rationale[:300])
         created.append(it)
     
     elif template == "refund_as_revenue":
