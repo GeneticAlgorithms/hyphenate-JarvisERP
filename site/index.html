@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>JarvisERP — Autonomous Staff Accountant · Cal Hacks 2026</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%237a1414'/><rect x='6' y='8' width='4' height='20' fill='%23fa6610' rx='1'/><rect x='14' y='12' width='4' height='16' fill='%23fa6610' rx='1'/><rect x='22' y='8' width='4' height='20' fill='%23fa6610' rx='1'/></svg>">
   <link rel="stylesheet" href="./src/style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -127,7 +128,16 @@
 
           <!-- Challenge & Defense -->
           <div class="challenge-section" id="challengeSection">
-            <div class="challenge-card">
+            <div class="challenge-intro">
+              <p>Click below to see how Jarvis handles challenges</p>
+            </div>
+            
+            <div class="challenge-buttons">
+              <button class="btn-challenge" id="challengeBtn">Challenge It</button>
+              <button class="btn-challenge" id="newEvidenceBtn" style="display:none;">New Evidence: Show Moved to Sep 28</button>
+            </div>
+
+            <div class="challenge-card" id="challengeCard" style="display:none;">
               <div class="challenge-header">
                 <span class="actor-label">Controller challenges:</span>
               </div>
@@ -136,7 +146,7 @@
               </div>
             </div>
 
-            <div class="defense-card" id="defenseCard">
+            <div class="defense-card" id="defenseCard" style="display:none;">
               <div class="defense-header">
                 <span class="actor-label">Jarvis defends:</span>
               </div>
@@ -145,6 +155,24 @@
                 <p><strong>2. The personal purchase</strong> is a control issue. Policy P-0317 (March ruling) requires it goes to Employee Receivable regardless of amount.</p>
                 <p><strong>3. Vendor deduplication:</strong> Creating a new "Claude" vendor when Anthropic exists adds complexity and breaks reporting.</p>
                 <p class="evidence">Evidence: SOW Berlin-Nov-14.pdf · log hash 0x1a3f8b · P-0317 approved by M. Chen</p>
+              </div>
+            </div>
+
+            <div class="concession-card" id="concessionCard" style="display:none;">
+              <div class="concession-header">
+                <span class="actor-label">Jarvis concedes & re-proposes:</span>
+              </div>
+              <div class="concession-text">
+                <p><strong>New evidence accepted.</strong> The Berlin show was moved from November 14 to September 28 (email Sept 15).</p>
+                <p><strong>Updated entry:</strong></p>
+                <div class="concession-entry">
+                  <div class="entry-line"><span class="account">6310 Tour Production Costs</span> <span class="amount">$3,451.50</span></div>
+                  <div class="entry-line"><span class="account">6810 Bank & FX Fees</span> <span class="amount">$147.50</span></div>
+                  <div class="entry-line"><span class="account">6420 Software</span> <span class="amount">$200.00</span></div>
+                  <div class="entry-line"><span class="account">1250 Employee Receivable</span> <span class="amount">$113.44</span></div>
+                  <div class="entry-line credit"><span class="account">1010 Cash</span> <span class="amount">$3,912.44</span></div>
+                </div>
+                <p class="concession-note">Prepaid → Expense. Ready for Controller approval.</p>
               </div>
             </div>
           </div>
@@ -200,11 +228,21 @@
               <div class="shape-desc">"PAYPAL INST XFER"</div>
             </div>
 
+            <svg class="connector mismatch-connector" id="connector1" width="100" height="60">
+              <path d="M 10 30 Q 50 10, 90 30" stroke="#c62828" stroke-width="3" fill="none" stroke-dasharray="5,5"/>
+              <text x="50" y="50" text-anchor="middle" fill="#c62828" font-size="12">✗</text>
+            </svg>
+
             <div class="system-shape ledger-shape" id="ledgerShape">
               <div class="shape-label">Ledger (QBO)</div>
               <div class="shape-value">$3,912.44</div>
               <div class="shape-desc">"Software Expense"</div>
             </div>
+
+            <svg class="connector mismatch-connector" id="connector2" width="100" height="60">
+              <path d="M 10 30 Q 50 50, 90 30" stroke="#c62828" stroke-width="3" fill="none" stroke-dasharray="5,5"/>
+              <text x="50" y="20" text-anchor="middle" fill="#c62828" font-size="12">✗</text>
+            </svg>
 
             <div class="system-shape paypal-shape" id="paypalShape">
               <div class="shape-label">PayPal Detail</div>
@@ -232,6 +270,17 @@
               <div class="sol-item">
                 <strong>Escalate conflicts:</strong> When evidence disagrees, ask the Controller
               </div>
+            </div>
+            
+            <!-- Connectors showing the fit -->
+            <div class="fit-connectors" id="fitConnectors" style="display:none;">
+              <svg width="100%" height="100">
+                <line x1="20%" y1="50" x2="40%" y2="50" stroke="#2f7d4a" stroke-width="3"/>
+                <line x1="50%" y1="50" x2="70%" y2="50" stroke="#2f7d4a" stroke-width="3"/>
+                <circle cx="30%" cy="50" r="8" fill="#2f7d4a"/>
+                <circle cx="60%" cy="50" r="8" fill="#2f7d4a"/>
+                <text x="50%" y="80" text-anchor="middle" fill="#2f7d4a" font-size="14" font-weight="600">✓ All sources reconciled</text>
+              </svg>
             </div>
           </div>
         </div>
@@ -427,61 +476,65 @@
 
         <div class="arch-diagram" id="archDiagram">
           <!-- Will be animated with layered reveals -->
-          <div class="arch-layer" data-layer="sources">
-            <div class="layer-title">Source Systems</div>
-            <div class="arch-boxes">
-              <div class="arch-box">Chase Bank</div>
-              <div class="arch-box">PayPal</div>
-              <div class="arch-box">Ramp</div>
-              <div class="arch-box">Email/Drive</div>
+          <div class="arch-row">
+            <div class="arch-layer" data-layer="sources">
+              <div class="layer-title">Source Systems</div>
+              <div class="arch-boxes">
+                <div class="arch-box">Chase Bank</div>
+                <div class="arch-box">PayPal</div>
+                <div class="arch-box">Ramp</div>
+                <div class="arch-box">Email/Drive</div>
+              </div>
+            </div>
+
+            <div class="arch-arrow-down">↓</div>
+
+            <div class="arch-layer" data-layer="erp">
+              <div class="layer-title">ERP / QuickBooks</div>
+              <div class="arch-boxes">
+                <div class="arch-box">Bank Feed</div>
+                <div class="arch-box">General Ledger</div>
+                <div class="arch-box">Chart of Accounts</div>
+                <div class="arch-box">AP/AR Subledgers</div>
+                <div class="arch-box">Vendor Master</div>
+              </div>
             </div>
           </div>
 
-          <div class="arch-arrow">→</div>
-
-          <div class="arch-layer" data-layer="erp">
-            <div class="layer-title">ERP / QuickBooks</div>
-            <div class="arch-boxes">
-              <div class="arch-box">Bank Feed</div>
-              <div class="arch-box">General Ledger</div>
-              <div class="arch-box">Chart of Accounts</div>
-              <div class="arch-box">AP/AR Subledgers</div>
-              <div class="arch-box">Vendor Master</div>
+          <div class="arch-row">
+            <div class="arch-layer" data-layer="jarvis">
+              <div class="layer-title">Jarvis System of Work</div>
+              <div class="arch-boxes">
+                <div class="arch-box highlight">Work Items (state machine)</div>
+                <div class="arch-box highlight">Evidence Store & Search</div>
+                <div class="arch-box highlight">Learned Policies</div>
+                <div class="arch-box highlight">Single Gateway (only writer)</div>
+                <div class="arch-box highlight">Hash-Chained Audit Log</div>
+              </div>
             </div>
           </div>
 
-          <div class="arch-arrow">→</div>
+          <div class="arch-row">
+            <div class="arch-arrow-down">↓</div>
 
-          <div class="arch-layer" data-layer="jarvis">
-            <div class="layer-title">Jarvis System of Work</div>
-            <div class="arch-boxes">
-              <div class="arch-box highlight">Work Items (state machine)</div>
-              <div class="arch-box highlight">Evidence Store & Search</div>
-              <div class="arch-box highlight">Learned Policies</div>
-              <div class="arch-box highlight">Single Gateway (only writer)</div>
-              <div class="arch-box highlight">Hash-Chained Audit Log</div>
+            <div class="arch-layer" data-layer="people">
+              <div class="layer-title">People</div>
+              <div class="arch-boxes">
+                <div class="arch-box">Controller (approves/rejects)</div>
+                <div class="arch-box">Dev (hands off)</div>
+                <div class="arch-box">Auditor (asks why)</div>
+              </div>
             </div>
-          </div>
 
-          <div class="arch-arrow">→</div>
+            <div class="arch-arrow-down">↓</div>
 
-          <div class="arch-layer" data-layer="people">
-            <div class="layer-title">People</div>
-            <div class="arch-boxes">
-              <div class="arch-box">Controller (approves/rejects)</div>
-              <div class="arch-box">Dev (hands off)</div>
-              <div class="arch-box">Auditor (asks why)</div>
-            </div>
-          </div>
-
-          <div class="arch-arrow">→</div>
-
-          <div class="arch-layer" data-layer="outputs">
-            <div class="layer-title">Outputs</div>
-            <div class="arch-boxes">
-              <div class="arch-box">Drive Evidence Folder</div>
-              <div class="arch-box">Financial Package</div>
-              <div class="arch-box">Journal Entries</div>
+            <div class="arch-layer" data-layer="outputs">
+              <div class="layer-title">Outputs</div>
+              <div class="arch-boxes">
+                <div class="arch-box">Drive Evidence Folder</div>
+                <div class="arch-box">Financial Package</div>
+                <div class="arch-box">Journal Entries</div>
+              </div>
             </div>
           </div>
 
@@ -591,37 +644,48 @@
             </div>
 
             <!-- Audit Chain -->
-            <div class="trust-card">
+            <div class="trust-card audit-card">
               <h3>Hash-Chained Audit Log</h3>
-              <div class="audit-chain" id="auditChain">
-                <div class="audit-block" data-block="1">
-                  <div class="block-hash">0x7f3a...</div>
-                  <div class="block-content">Block 1: Sync bank line</div>
-                  <div class="block-prev">prev: null</div>
+              <div class="audit-chain-wrapper">
+                <div class="audit-chain" id="auditChain">
+                  <div class="audit-block" data-block="1">
+                    <div class="block-hash">0x7f3a...</div>
+                    <div class="block-content">Block 1: Sync bank line</div>
+                    <div class="block-prev">prev: null</div>
+                  </div>
+                  <div class="chain-link">→</div>
+                  <div class="audit-block" data-block="2">
+                    <div class="block-hash">0x9c21...</div>
+                    <div class="block-content">Block 2: Agent proposes</div>
+                    <div class="block-prev">prev: 0x7f3a...</div>
+                  </div>
+                  <div class="chain-link">→</div>
+                  <div class="audit-block" data-block="3">
+                    <div class="block-hash">0x4d88...</div>
+                    <div class="block-content">Block 3: Controller approves</div>
+                    <div class="block-prev">prev: 0x9c21...</div>
+                  </div>
+                  <div class="chain-link">→</div>
+                  <div class="audit-block" data-block="4">
+                    <div class="block-hash">0x1b5f...</div>
+                    <div class="block-content">Block 4: Gateway posts</div>
+                    <div class="block-prev">prev: 0x4d88...</div>
+                  </div>
                 </div>
-                <div class="chain-link">→</div>
-                <div class="audit-block" data-block="2">
-                  <div class="block-hash">0x9c21...</div>
-                  <div class="block-content">Block 2: Agent proposes</div>
-                  <div class="block-prev">prev: 0x7f3a...</div>
-                </div>
-                <div class="chain-link">→</div>
-                <div class="audit-block" data-block="3">
-                  <div class="block-hash">0x4d88...</div>
-                  <div class="block-content">Block 3: Controller approves</div>
-                  <div class="block-prev">prev: 0x9c21...</div>
-                </div>
-                <div class="chain-link">→</div>
-                <div class="audit-block" data-block="4">
-                  <div class="block-hash">0x1b5f...</div>
-                  <div class="block-content">Block 4: Gateway posts</div>
-                  <div class="block-prev">prev: 0x4d88...</div>
+                <div class="tamper-message" id="tamperMessage" style="display:none;">
+                  <div class="tamper-icon">⚠</div>
+                  <div class="tamper-text">
+                    <strong>Tampering detected!</strong> Changing block 3 breaks the hash chain. All subsequent blocks are now invalid.
+                  </div>
                 </div>
               </div>
               <div class="trust-rule">
                 <strong>Tamper detection:</strong> Changing one block breaks the chain. Append-only, no updates.
               </div>
-              <button class="btn-ghost small" id="tamperTest">Simulate Tampering</button>
+              <div class="audit-actions">
+                <button class="btn-ghost small" id="tamperTest">Simulate Tampering</button>
+                <button class="btn-ghost small" id="resetChain" style="display:none;">Reset Chain</button>
+              </div>
             </div>
           </div>
         </div>

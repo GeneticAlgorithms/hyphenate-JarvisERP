@@ -52,13 +52,13 @@ const glossaryTerms = [
     example: 'AP subledger: 12 vendor bills total $45,200 → GL account 2010'
   },
   {
-    name: 'Accounts Payable (AP)',
+    name: 'Accounts Payable',
     category: 'accounts',
     definition: 'Money the company owes to vendors for goods/services received but not yet paid.',
     example: 'Lumen Crew invoices $13,020 on Oct 8 → AP liability until paid'
   },
   {
-    name: 'Accounts Receivable (AR)',
+    name: 'Accounts Receivable',
     category: 'accounts',
     definition: 'Money customers owe the company for goods/services delivered but not yet paid.',
     example: 'Interest earned Sep 30, deposited Oct 1 → Other Receivable at 9/30'
@@ -106,9 +106,9 @@ const glossaryTerms = [
     example: 'Interest earned Sep 30, deposited Oct 1 → timing difference'
   },
   {
-    name: 'FX / Currency Conversion',
+    name: 'FX',
     category: 'transactions',
-    definition: 'Exchanging one currency for another. The spread between market and actual rate is a fee.',
+    definition: 'Foreign exchange. Converting one currency to another, often with fees.',
     example: 'PayPal converts €2,950 at 1.2200 vs market 1.1700 → $147.50 FX fee'
   },
   {
@@ -166,12 +166,6 @@ const glossaryTerms = [
     example: 'Maya Chen (Controller) approves accruals, rejects self-approvals, answers questions'
   },
   {
-    name: 'Flux Analysis',
-    category: 'processes',
-    definition: 'Explaining period-over-period changes by identifying the drivers (new accounts, rate changes, etc).',
-    example: 'Software expense up $2,400 in Sep → driver: new Claude Max subscription'
-  },
-  {
     name: 'Trial Balance',
     category: 'reports',
     definition: 'A report showing every account\'s balance. Must sum to zero (debits = credits).',
@@ -192,6 +186,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initGlossary();
   initInteractiveElements();
   initProgressBar();
+  initChallengeDefense();
+  initThreeSystemsConnectors();
 });
 
 // Initialize scroll-triggered animations with GSAP
@@ -240,28 +236,6 @@ function initScrollAnimations() {
     scrollTrigger: {
       trigger: '#splitContainer',
       start: 'top 70%',
-    }
-  });
-
-  // Challenge section
-  gsap.to('#challengeSection', {
-    opacity: 1,
-    duration: 0.8,
-    scrollTrigger: {
-      trigger: '#challengeSection',
-      start: 'top 75%',
-    }
-  });
-
-  // Defense card
-  gsap.to('#defenseCard', {
-    opacity: 1,
-    y: 0,
-    duration: 0.8,
-    delay: 0.4,
-    scrollTrigger: {
-      trigger: '#challengeSection',
-      start: 'top 60%',
     }
   });
 
@@ -359,7 +333,7 @@ function initScrollAnimations() {
       opacity: 1,
       y: 0,
       duration: 0.8,
-      delay: index * 0.2,
+      delay: index * 0.3,
       scrollTrigger: {
         trigger: '#archDiagram',
         start: 'top 70%',
@@ -372,18 +346,18 @@ function initScrollAnimations() {
   if (packet) {
     gsap.to(packet, {
       opacity: 1,
-      x: () => {
+      y: () => {
         const diagram = document.getElementById('archDiagram');
-        return diagram ? diagram.offsetWidth - 50 : 1000;
+        return diagram ? diagram.offsetHeight - 100 : 500;
       },
-      duration: 3,
+      duration: 4,
       ease: 'power1.inOut',
       scrollTrigger: {
         trigger: '#archDiagram',
         start: 'top 50%',
       },
       onComplete: () => {
-        // Show rejection flash at Jarvis layer
+        // Show rejection flash
         const rejection = document.getElementById('rejectionFlash');
         if (rejection) {
           gsap.to(rejection, {
@@ -484,7 +458,7 @@ function initProgressBar() {
   });
 }
 
-// Initialize Present Mode
+// Initialize Present Mode with autoplay support
 function initPresentMode() {
   const presentBtn = document.getElementById('presentBtn');
   const presentMode = document.getElementById('presentMode');
@@ -495,6 +469,12 @@ function initPresentMode() {
 
   const sections = Array.from(document.querySelectorAll('.section'));
   let currentSlide = 0;
+  let autoplayInterval = null;
+  
+  // Check for autoplay parameter
+  const urlParams = new URLSearchParams(window.location.search);
+  const autoplay = urlParams.get('autoplay') === '1';
+  const duration = parseInt(urlParams.get('dur') || '8') * 1000;
 
   const updateSlideCounter = () => {
     slideCounter.textContent = `${currentSlide + 1} / ${sections.length}`;
@@ -509,7 +489,7 @@ function initPresentMode() {
     // Clone the section content
     slideContainer.innerHTML = section.innerHTML;
     
-    // Re-run any animations for the slide
+    // Re-run animations for the slide
     gsap.from(slideContainer.children, {
       opacity: 0,
       y: 30,
@@ -520,22 +500,48 @@ function initPresentMode() {
     updateSlideCounter();
   };
 
+  const startAutoplay = () => {
+    if (autoplayInterval) clearInterval(autoplayInterval);
+    
+    autoplayInterval = setInterval(() => {
+      if (currentSlide < sections.length - 1) {
+        currentSlide++;
+        showSlide(currentSlide);
+      } else {
+        stopAutoplay();
+      }
+    }, duration);
+  };
+
+  const stopAutoplay = () => {
+    if (autoplayInterval) {
+      clearInterval(autoplayInterval);
+      autoplayInterval = null;
+    }
+  };
+
   presentBtn.addEventListener('click', () => {
     presentMode.classList.remove('hidden');
     currentSlide = 0;
     showSlide(currentSlide);
     document.body.style.overflow = 'hidden';
+    
+    if (autoplay) {
+      startAutoplay();
+    }
   });
 
   exitBtn.addEventListener('click', () => {
     presentMode.classList.add('hidden');
     document.body.style.overflow = '';
+    stopAutoplay();
   });
 
   prevBtn.addEventListener('click', () => {
     if (currentSlide > 0) {
       currentSlide--;
       showSlide(currentSlide);
+      stopAutoplay();
     }
   });
 
@@ -543,6 +549,7 @@ function initPresentMode() {
     if (currentSlide < sections.length - 1) {
       currentSlide++;
       showSlide(currentSlide);
+      if (autoplay) startAutoplay();
     }
   });
 
@@ -553,19 +560,86 @@ function initPresentMode() {
     if (e.key === 'Escape') {
       presentMode.classList.add('hidden');
       document.body.style.overflow = '';
+      stopAutoplay();
     } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
       if (currentSlide > 0) {
         currentSlide--;
         showSlide(currentSlide);
+        stopAutoplay();
       }
     } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
       e.preventDefault();
       if (currentSlide < sections.length - 1) {
         currentSlide++;
         showSlide(currentSlide);
+        if (autoplay) startAutoplay();
       }
     }
   });
+}
+
+// Initialize Challenge/Defense Interactive
+function initChallengeDefense() {
+  const challengeBtn = document.getElementById('challengeBtn');
+  const newEvidenceBtn = document.getElementById('newEvidenceBtn');
+  const challengeCard = document.getElementById('challengeCard');
+  const defenseCard = document.getElementById('defenseCard');
+  const concessionCard = document.getElementById('concessionCard');
+
+  if (challengeBtn) {
+    challengeBtn.addEventListener('click', () => {
+      challengeCard.style.display = 'block';
+      gsap.from(challengeCard, { opacity: 0, y: 20, duration: 0.5 });
+      
+      setTimeout(() => {
+        defenseCard.style.display = 'block';
+        gsap.from(defenseCard, { opacity: 0, y: 20, duration: 0.5 });
+        newEvidenceBtn.style.display = 'inline-block';
+      }, 1000);
+    });
+  }
+
+  if (newEvidenceBtn) {
+    newEvidenceBtn.addEventListener('click', () => {
+      concessionCard.style.display = 'block';
+      gsap.from(concessionCard, { opacity: 0, y: 20, duration: 0.5 });
+    });
+  }
+}
+
+// Initialize Three Systems Connectors
+function initThreeSystemsConnectors() {
+  const connectors = document.querySelectorAll('.connector');
+  const fitConnectors = document.getElementById('fitConnectors');
+
+  gsap.utils.toArray(connectors).forEach((connector, index) => {
+    gsap.to(connector, {
+      opacity: 1,
+      scrollTrigger: {
+        trigger: '#systemShapes',
+        start: 'top 60%',
+      },
+      delay: 0.5 + index * 0.3,
+      onStart: () => {
+        connector.classList.add('visible');
+      }
+    });
+  });
+
+  if (fitConnectors) {
+    gsap.to(fitConnectors, {
+      opacity: 1,
+      scrollTrigger: {
+        trigger: '#solutionPanel',
+        start: 'top 60%',
+      },
+      delay: 0.5,
+      onStart: () => {
+        fitConnectors.style.display = 'block';
+        fitConnectors.classList.add('visible');
+      }
+    });
+  }
 }
 
 // Initialize glossary with search and flip cards
@@ -606,40 +680,67 @@ function initGlossary() {
   renderTerms(glossaryTerms);
 
   // Search functionality
-  searchInput.addEventListener('input', (e) => {
-    const query = e.target.value.toLowerCase();
-    const filtered = query
-      ? glossaryTerms.filter(term =>
-          term.name.toLowerCase().includes(query) ||
-          term.definition.toLowerCase().includes(query) ||
-          term.example.toLowerCase().includes(query)
-        )
-      : glossaryTerms;
-    
-    renderTerms(filtered);
-  });
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      const query = e.target.value.toLowerCase();
+      const filtered = query
+        ? glossaryTerms.filter(term =>
+            term.name.toLowerCase().includes(query) ||
+            term.definition.toLowerCase().includes(query) ||
+            term.example.toLowerCase().includes(query)
+          )
+        : glossaryTerms;
+      
+      renderTerms(filtered);
+    });
+  }
 }
 
 // Initialize interactive elements
 function initInteractiveElements() {
-  // Tamper test for audit chain
+  // Improved tamper test for audit chain
   const tamperBtn = document.getElementById('tamperTest');
+  const resetBtn = document.getElementById('resetChain');
+  const tamperMessage = document.getElementById('tamperMessage');
+  
   if (tamperBtn) {
     tamperBtn.addEventListener('click', () => {
-      const block = document.querySelector('.audit-block[data-block="3"]');
-      if (block) {
-        block.classList.add('tampered');
-        block.querySelector('.block-content').textContent = 'Block 3: [TAMPERED]';
+      const block3 = document.querySelector('.audit-block[data-block="3"]');
+      const block4 = document.querySelector('.audit-block[data-block="4"]');
+      
+      if (block3 && block4) {
+        block3.classList.add('tampered');
+        block3.querySelector('.block-content').textContent = 'Block 3: [TAMPERED]';
         
-        // Show all subsequent blocks as broken
-        const nextBlocks = document.querySelectorAll('.audit-block[data-block="4"]');
-        nextBlocks.forEach(b => b.classList.add('tampered'));
-        
-        // Alert
         setTimeout(() => {
-          alert('⚠ Tampering detected! Changing block 3 breaks the hash chain. All subsequent blocks are now invalid.');
+          block4.classList.add('tampered');
+          if (tamperMessage) {
+            tamperMessage.style.display = 'flex';
+          }
+          if (resetBtn) {
+            resetBtn.style.display = 'inline-block';
+          }
         }, 500);
       }
+    });
+  }
+
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      const blocks = document.querySelectorAll('.audit-block');
+      blocks.forEach(block => {
+        block.classList.remove('tampered');
+      });
+      
+      const block3 = document.querySelector('.audit-block[data-block="3"]');
+      if (block3) {
+        block3.querySelector('.block-content').textContent = 'Block 3: Controller approves';
+      }
+      
+      if (tamperMessage) {
+        tamperMessage.style.display = 'none';
+      }
+      resetBtn.style.display = 'none';
     });
   }
 
@@ -653,34 +754,6 @@ function initInteractiveElements() {
       }
     });
   });
-
-  // Add hover tooltips for glossary terms in text
-  addGlossaryTooltips();
-}
-
-// Add tooltips for glossary terms mentioned in the content
-function addGlossaryTooltips() {
-  const termNames = glossaryTerms.map(t => t.name.toLowerCase());
-  
-  // This is a simplified version - in production you'd want more sophisticated text parsing
-  document.querySelectorAll('p, li, .layer-text').forEach(element => {
-    let html = element.innerHTML;
-    
-    termNames.forEach(termName => {
-      const term = glossaryTerms.find(t => t.name.toLowerCase() === termName);
-      if (!term) return;
-      
-      // Simple word boundary replacement (not perfect but works for demo)
-      const regex = new RegExp(`\\b${termName}\\b`, 'gi');
-      if (regex.test(html) && !html.includes('<a ') && !html.includes('class="term-name"')) {
-        html = html.replace(regex, match => 
-          `<span class="glossary-term" title="${term.definition}">${match}</span>`
-        );
-      }
-    });
-    
-    element.innerHTML = html;
-  });
 }
 
 // Export for debugging
@@ -688,5 +761,7 @@ window.jarvisExplainer = {
   glossaryTerms,
   initScrollAnimations,
   initPresentMode,
-  initGlossary
+  initGlossary,
+  initChallengeDefense,
+  initThreeSystemsConnectors
 };
