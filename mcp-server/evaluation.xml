@@ -1,0 +1,48 @@
+<!--
+  Evaluation for jarvis-erp-mcp-server.
+  Setup (once, before running): world seed 2026, state right after the September close and before any Controller decision:
+    jarvis_reset_world(seed=2026) -> jarvis_run_step(connect) -> jarvis_run_step(onboard) -> jarvis_run_step(close)
+  Every question is answerable with read-only tools from that state. Work item IDs change per run, so answers never use them.
+-->
+<evaluation>
+  <qa_pair>
+    <question>Jarvis split the -$3,912.44 PayPal instant transfer on the September bank statement. How many US dollars of it did Jarvis propose to book to the prepaid tour costs account, and what is that account's number? Answer as "amount, account" with the amount to the cent and no dollar sign.</question>
+    <answer>3451.50, 1310</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>The euro deposit inside the -$3,912.44 PayPal transfer was paid to a rigging company for a future show. According to the statement of work Jarvis cited, on what date (YYYY-MM-DD) is that service performed?</question>
+    <answer>2026-11-14</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Across all of Jarvis's proposed PayPal transfer splits for September, what is the total amount of PayPal FX spread proposed to account 6810 Bank &amp; FX Fees? Give the USD amount to the cent with no dollar sign.</question>
+    <answer>233.54</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Which ECB EUR/USD rate did Jarvis use to value the Kraftwerk Rigging deposit? Give the number exactly as Jarvis states it.</question>
+    <answer>1.17</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Jarvis emailed one outside person asking them to confirm their September amount and send an invoice. What is that person's full name?</question>
+    <answer>Nadia Kroll</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Among Jarvis's proposed vendor accruals for September (excluding interest), which vendor has the largest accrual amount?</question>
+    <answer>Lumen Crew LLC</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Jarvis asked the Controller about a $350.00 Zelle payment it couldn't explain, and cited the closest piece of evidence it found: a run of show. In which city was that show?</question>
+    <answer>Oakland</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Ramp's data suggested creating a new vendor called "Claude". Which existing vendor in the vendor master did Jarvis propose linking it to instead? Give the short vendor name.</question>
+    <answer>Anthropic</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Of the accounting policies Jarvis proposed during onboarding, how many are backed by more than two precedents?</question>
+    <answer>3</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Before any Controller approvals, what is the September bank reconciliation difference between the statement ending balance and ledger cash, and how many bank lines are unreconciled? Answer as "amount, count", with the amount in USD to the cent including its sign and no dollar sign.</question>
+    <answer>-7524.65, 4</answer>
+  </qa_pair>
+</evaluation>
