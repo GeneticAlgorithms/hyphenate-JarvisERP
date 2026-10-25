@@ -44,6 +44,7 @@ def _template(item: dict, question: str) -> str:
     if item["kind"] == "paypal_split" and ("expense" in q or "software" in q or "materiality" in q or "always" in q):
         total = -sum(l["cents"] for l in lines if l["acct"] in ("1010", "1030"))
         not_expense = sum(l["cents"] for l in bs)
+        personal_line = next((l for l in lines if l["acct"] == "1250"), None)
         out.append(f"Booking the whole {fmt(total)} as Software Expense would overstate September operating expenses by "
                    f"{fmt(not_expense)} - money that isn't a September expense at all:")
         for l in bs:
@@ -59,6 +60,9 @@ def _template(item: dict, question: str) -> str:
             out.append(f"• {fmt(fee['cents'])} is PayPal's FX spread - a real cost, but a bank/FX fee, not software.")
         if sw:
             out.append(f"• Only {fmt(sw['cents'])} is actually software ({sw['memo']}).")
+        if personal_line and "materiality" in q:
+            out.append(f"The {fmt(personal_line['cents'])} personal purchase is classified under P-0317 regardless of "
+                      f"materiality because it's a control issue: employee reimbursables must be tracked separately.")
         out.append("Every figure ties to a source record: the bank line, the PayPal funding row, each payment and its "
                    "conversion row, the ECB rate and the SOW (click any node to see it).")
     elif item["kind"] == "accrual" and ("email" in q or "10k" in q or "estimate" in q or "why" in q or "lower" in q):
