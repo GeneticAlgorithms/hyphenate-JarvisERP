@@ -22,7 +22,7 @@ TEMPLATES = {
     "unknown_debit": {"label": "Unknown bank debit", "params": {"amount": 742.18, "description": "SQ *MOONLIGHT GEAR CO",
                                                                 "date": "2026-09-29"}},
     "invoice_over_accrual": {"label": "Vendor invoices more than we accrued",
-                             "params": {"vendor": "Lumen Crew LLC", "amount": 13020.00}},
+                             "params": {"vendor": "Lumen Crew LLC", "amount": 13020.00, "date": "2026-10-09"}},
     "personal_card": {"label": "Personal purchase on a company card",
                       "params": {"merchant": "SEPHORA #2210", "amount": 96.40, "cardholder": "J. Ortiz",
                                  "date": "2026-09-27"}},
@@ -36,7 +36,8 @@ TEMPLATES = {
     "vendor_bank_change": {"label": "Vendor changes bank account before payment",
                           "params": {"vendor": "Lumen Crew LLC", "amount": 12000.00, "date": "2026-09-28"}},
     "split_purchases": {"label": "Multiple small purchases under approval threshold",
-                       "params": {"merchant": "Office Depot", "amounts": [245.00, 235.00, 240.00], "date": "2026-09-20"}},
+                       "params": {"merchant": "Office Depot", "amounts": [245.00, 235.00, 240.00], "date": "2026-09-20",
+                                 "count": 3, "approval_limit": 2500.00, "source": "Ramp"}},
     "ghost_vendor": {"label": "Payment to non-existent vendor",
                     "params": {"vendor": "Advanced Solutions Inc", "amount": 8500.00, "date": "2026-09-22"}},
     "refund_as_revenue": {"label": "Refund incorrectly booked as revenue",
@@ -262,47 +263,45 @@ def inject(session, text: str | None = None, template: str | None = None, params
         if v:
             cents = int(params["amount"] * 100)
             d = params["date"]
-            with db.tx():
-                anchor = f"inject:bank_change:{tag}:{v['id']}"
-                it = create_item(db, SYNC, "vendor_bank_change", anchor, 
-                                f"ALERT: {v['qbo_name']} bank details changed before ${params['amount']:.2f} payment",
-                                d[:7], [], 
-                                evidence=[{"type": "alert", "id": f"email-{tag}", "source": "email", 
-                                          "desc": f"Email from look-alike domain requesting bank change"}])
-                # Transition to NEEDS_INFO with evidence and requirement for callback
-                patch = {
-                    "alert": f"Vendor {v['qbo_name']} emailed new bank details before ${params['amount']:.2f} payment",
-                    "vendor_id": v["id"],
-                    "amount_cents": cents,
-                    "date": d,
-                    "requires": "callback_verification",
-                    "phone_on_file": "vendor master phone",
-                    "email_domain": v.get("domain", ""),
-                    "suspicious": True,
-                    "injected": text or template
-                }
-                it = transition(db, it["item_id"], "ask", JARVIS, patch, 
-                               reason=f"Bank detail change from look-alike domain before large payment - MUST verify via callback to {v['qbo_name']} phone on file before processing")
-                created.append(it)
+            anchor = f"inject:bank_change:{tag}:{v['id']}"
+            it = create_item(db, SYNC, "vendor_bank_change", anchor, 
+                            f"ALERT: {v['qbo_name']} bank details changed before ${params['amount']:.2f} payment",
+                            d[:7], [], 
+                            evidence=[{"type": "alert", "id": f"email-{tag}", "source": "email", 
+                                      "desc": f"Email from look-alike domain requesting bank change"}])
+            # Transition to NEEDS_INFO with evidence and requirement for callback
+            patch = {
+                "alert": f"Vendor {v['qbo_name']} emailed new bank details before ${params['amount']:.2f} payment",
+                "vendor_id": v["id"],
+                "amount_cents": cents,
+                "date": d,
+                "requires": "callback_verification",
+                "phone_on_file": "vendor master phone",
+                "email_domain": v.get("domain", ""),
+                "suspicious": True,
+                "injected": text or template
+            }
+            it = transition(db, it["item_id"], "ask", JARVIS, patch, 
+                           reason=f"Bank detail change from look-alike domain before large payment - MUST verify via callback to {v['qbo_name']} phone on file before processing")
+            created.append(it)
         else:
             # Vendor not found, create generic alert
             cents = int(params["amount"] * 100)
             d = params.get("date", "2026-09-28")
-            with db.tx():
-                anchor = f"inject:bank_change:{tag}:unknown"
-                it = create_item(db, SYNC, "vendor_bank_change", anchor,
-                                f"ALERT: Unknown vendor bank change before ${params['amount']:.2f} payment",
-                                d[:7], [])
-                patch = {
-                    "alert": f"Bank detail change email for unknown vendor before ${params['amount']:.2f} payment",
-                    "amount_cents": cents,
-                    "date": d,
-                    "requires": "verification",
-                    "injected": text or template
-                }
-                it = transition(db, it["item_id"], "ask", JARVIS, patch,
-                               reason="Bank detail change for unknown vendor - must verify before any payment")
-                created.append(it)
+            anchor = f"inject:bank_change:{tag}:unknown"
+            it = create_item(db, SYNC, "vendor_bank_change", anchor,
+                            f"ALERT: Unknown vendor bank change before ${params['amount']:.2f} payment",
+                            d[:7], [])
+            patch = {
+                "alert": f"Bank detail change email for unknown vendor before ${params['amount']:.2f} payment",
+                "amount_cents": cents,
+                "date": d,
+                "requires": "verification",
+                "injected": text or template
+            }
+            it = transition(db, it["item_id"], "ask", JARVIS, patch,
+                           reason="Bank detail change for unknown vendor - must verify before any payment")
+            created.append(it)
     
     elif template == "split_purchases":
         # Create N charges, then flag them as split to evade approval limits
@@ -321,8 +320,8 @@ def inject(session, text: str | None = None, template: str | None = None, params
         approval_limit = params.get("approval_limit", 2500.0)
         
         record_ids = []
+        # Create ALL N charges first
         with db.tx():
-            # Create ALL N charges first
             for i, amt in enumerate(amounts):
                 cents = int(amt * 100)
                 if source == "Ramp":
@@ -348,31 +347,31 @@ def inject(session, text: str | None = None, template: str | None = None, params
                                     "Expense", "", "ramp_sync", J({"ramp_id": rid}), None, "ramp_sync", now()))
                     db.conn.execute("INSERT INTO ledger_lines VALUES(?,?,?,?,?,?)", (eid, 0, "6900", cents, "", None))
                     db.conn.execute("INSERT INTO ledger_lines VALUES(?,?,?,?,?,?)", (eid, 1, "2050", -cents, "", None))
-            
-            # Now create the work item flagging this as threshold avoidance
-            anchor = f"inject:split:{tag}"
-            total_cents = sum(int(a * 100) for a in amounts)
-            it = create_item(db, SYNC, "threshold_split", anchor, 
-                            f"ESCALATE: {count} purchases to {merchant} on {d}, each under ${approval_limit:.2f} limit (total ${total_cents/100:.2f})",
-                            d[:7], record_ids)
-            
-            # Transition to NEEDS_INFO with evidence of threshold splitting
-            patch = {
-                "count": count,
-                "amounts": amounts,
-                "total_cents": total_cents,
-                "approval_limit_cents": int(approval_limit * 100),
-                "merchant": merchant,
-                "source": source,
-                "date": d,
-                "flagged_for_review": True,
-                "escalate_to": "Controller",
-                "rationale": f"All {count} charges are under the ${approval_limit:.2f} approval limit",
-                "injected": text or template
-            }
-            it = transition(db, it["item_id"], "ask", JARVIS, patch, 
-                           reason=f"{count} charges to same vendor on same day, each under ${approval_limit:.2f} approval threshold - likely split to avoid review. Escalating to Controller")
-            created.append(it)
+        
+        # Now create the work item flagging this as threshold avoidance
+        anchor = f"inject:split:{tag}"
+        total_cents = sum(int(a * 100) for a in amounts)
+        it = create_item(db, SYNC, "threshold_split", anchor, 
+                        f"ESCALATE: {count} purchases to {merchant} on {d}, each under ${approval_limit:.2f} limit (total ${total_cents/100:.2f})",
+                        d[:7], record_ids)
+        
+        # Transition to NEEDS_INFO with evidence of threshold splitting
+        patch = {
+            "count": count,
+            "amounts": amounts,
+            "total_cents": total_cents,
+            "approval_limit_cents": int(approval_limit * 100),
+            "merchant": merchant,
+            "source": source,
+            "date": d,
+            "flagged_for_review": True,
+            "escalate_to": "Controller",
+            "rationale": f"All {count} charges are under the ${approval_limit:.2f} approval limit",
+            "injected": text or template
+        }
+        it = transition(db, it["item_id"], "ask", JARVIS, patch, 
+                       reason=f"{count} charges to same vendor on same day, each under ${approval_limit:.2f} approval threshold - likely split to avoid review. Escalating to Controller")
+        created.append(it)
     
     elif template == "ghost_vendor":
         # Block payment to vendor with no W-9/SOW or whose details match employee
@@ -396,31 +395,30 @@ def inject(session, text: str | None = None, template: str | None = None, params
             if person["name"].split()[-1] in vendor_name or vendor_name.split()[0] in person["name"]:
                 red_flags.append(f"Name similarity to employee {person['name']}")
         
-        with db.tx():
-            anchor = f"inject:ghost:{tag}:{vendor_name.replace(' ', '_')}"
-            it = create_item(db, SYNC, "ghost_vendor", anchor, 
-                            f"BLOCK: Payment to '{vendor_name}' ${params['amount']:.2f} - vendor verification required",
-                            d[:7], [],
-                            evidence=[{"type": "alert", "id": f"ghost-{tag}", "source": "vendor_check",
-                                      "desc": "; ".join(red_flags)}])
-            
-            # Transition to NEEDS_INFO - payment is BLOCKED
-            patch = {
-                "vendor_name": vendor_name,
-                "amount_cents": cents,
-                "date": d,
-                "in_master": in_master,
-                "no_w9": True,
-                "no_sow": True,
-                "red_flags": red_flags,
-                "requires": "vendor_verification",
-                "status": "BLOCKED",
-                "escalate_to": "Controller",
-                "injected": text or template
-            }
-            it = transition(db, it["item_id"], "ask", JARVIS, patch,
-                           reason=f"BLOCKING ${params['amount']:.2f} payment to '{vendor_name}': " + "; ".join(red_flags) + ". Escalating to Controller for vendor verification")
-            created.append(it)
+        anchor = f"inject:ghost:{tag}:{vendor_name.replace(' ', '_')}"
+        it = create_item(db, SYNC, "ghost_vendor", anchor, 
+                        f"BLOCK: Payment to '{vendor_name}' ${params['amount']:.2f} - vendor verification required",
+                        d[:7], [],
+                        evidence=[{"type": "alert", "id": f"ghost-{tag}", "source": "vendor_check",
+                                  "desc": "; ".join(red_flags)}])
+        
+        # Transition to NEEDS_INFO - payment is BLOCKED
+        patch = {
+            "vendor_name": vendor_name,
+            "amount_cents": cents,
+            "date": d,
+            "in_master": in_master,
+            "no_w9": True,
+            "no_sow": True,
+            "red_flags": red_flags,
+            "requires": "vendor_verification",
+            "status": "BLOCKED",
+            "escalate_to": "Controller",
+            "injected": text or template
+        }
+        it = transition(db, it["item_id"], "ask", JARVIS, patch,
+                       reason=f"BLOCKING ${params['amount']:.2f} payment to '{vendor_name}': " + "; ".join(red_flags) + ". Escalating to Controller for vendor verification")
+        created.append(it)
     
     elif template == "refund_as_revenue":
         # Customer refund incorrectly booked as revenue - propose reclass
@@ -437,46 +435,46 @@ def inject(session, text: str | None = None, template: str | None = None, params
                             "Revenue", "", "stripe_sync", J({"refund": True}), None, "stripe_sync", now()))
             db.conn.execute("INSERT INTO ledger_lines VALUES(?,?,?,?,?,?)", (wrong_eid, 0, "1010", cents, "", None))
             db.conn.execute("INSERT INTO ledger_lines VALUES(?,?,?,?,?,?)", (wrong_eid, 1, "4950", -cents, "", None))
-            
-            # Create work item to reclass it
-            anchor = f"inject:refund:{tag}:{merchant.replace(' ', '_')}"
-            it = create_item(db, SYNC, "refund_reclass", anchor,
-                            f"Reclass needed: +${params['amount']:.2f} from {merchant} is refund, not revenue",
-                            d[:7], [],
-                            evidence=[{"type": "ledger", "id": wrong_eid, "source": "ledger_entry",
-                                      "desc": f"Incorrectly booked to 4950 Other Income"}])
-            
-            # Propose the reclassification entry
-            # Debit 4950 (reverse the revenue), Credit proper account (contra-expense or AR)
-            # Find the original expense account for this vendor
-            original_acct = "5020"  # Bay Rig Rentals is gear rental
-            v = next((x for x in bible.VENDORS if merchant in x["qbo_name"] or x["qbo_name"] in merchant), None)
-            if v:
-                original_acct = v.get("default_acct", "5020")
-            
-            patch = {
-                "merchant": merchant,
-                "amount_cents": cents,
+        
+        # Create work item to reclass it
+        anchor = f"inject:refund:{tag}:{merchant.replace(' ', '_')}"
+        it = create_item(db, SYNC, "refund_reclass", anchor,
+                        f"Reclass needed: +${params['amount']:.2f} from {merchant} is refund, not revenue",
+                        d[:7], [],
+                        evidence=[{"type": "ledger", "id": f"JE-WRONGREV-{tag}", "source": "ledger_entry",
+                                  "desc": f"Incorrectly booked to 4950 Other Income"}])
+        
+        # Propose the reclassification entry
+        # Debit 4950 (reverse the revenue), Credit proper account (contra-expense or AR)
+        # Find the original expense account for this vendor
+        original_acct = "5020"  # Bay Rig Rentals is gear rental
+        v = next((x for x in bible.VENDORS if merchant in x["qbo_name"] or x["qbo_name"] in merchant), None)
+        if v:
+            original_acct = v.get("default_acct", "5020")
+        
+        patch = {
+            "merchant": merchant,
+            "amount_cents": cents,
+            "date": d,
+            "wrong_entry": f"JE-WRONGREV-{tag}",
+            "booked_to": "4950",
+            "should_be_contra": original_acct,
+            "proposal": {
                 "date": d,
-                "wrong_entry": wrong_eid,
-                "booked_to": "4950",
-                "should_be_contra": original_acct,
-                "proposal": {
-                    "date": d,
-                    "memo": f"Reclass {merchant} refund from revenue to contra-expense",
-                    "lines": [
-                        {"acct": "4950", "cents": cents, "memo": "Reverse incorrect revenue"},
-                        {"acct": original_acct, "cents": -cents, "memo": f"Contra-expense: {merchant} refund"}
-                    ],
-                    "txn_type": "Journal Entry",
-                    "match_entries": [wrong_eid]
-                },
-                "rationale": f"${params['amount']:.2f} credit from {merchant} was booked to 4950 Other Income, but this is a customer refund for services/rentals and should be recorded as a contra-expense in {original_acct} {bible.acct_name(original_acct)}",
-                "injected": text or template
-            }
-            it = transition(db, it["item_id"], "propose", JARVIS, patch,
-                           reason=f"Refund from {merchant} misclassified as revenue (4950); proposing reclass to contra-expense ({original_acct})")
-            created.append(it)
+                "memo": f"Reclass {merchant} refund from revenue to contra-expense",
+                "lines": [
+                    {"acct": "4950", "cents": cents, "memo": "Reverse incorrect revenue"},
+                    {"acct": original_acct, "cents": -cents, "memo": f"Contra-expense: {merchant} refund"}
+                ],
+                "txn_type": "Journal Entry",
+                "match_entries": [f"JE-WRONGREV-{tag}"]
+            },
+            "rationale": f"${params['amount']:.2f} credit from {merchant} was booked to 4950 Other Income, but this is a customer refund for services/rentals and should be recorded as a contra-expense in {original_acct} {bible.acct_name(original_acct)}",
+            "injected": text or template
+        }
+        it = transition(db, it["item_id"], "propose", JARVIS, patch,
+                       reason=f"Refund from {merchant} misclassified as revenue (4950); proposing reclass to contra-expense ({original_acct})")
+        created.append(it)
     
     elif template == "paypal_bundle":
         d = params["date"]
