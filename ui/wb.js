@@ -188,11 +188,21 @@ function buildFilters() {
 }
 function logEl(e) {
   const hasData = e.data !== null && e.data !== undefined;
+  const auditBadge = h("span", { 
+    class: "audit-badge", 
+    title: `Click to view audit row #${e.audit_seq || '?'}\nsha256 ${e.hash || '?'}`,
+    onclick: () => { selectTab("audit"); setTimeout(() => { 
+      const row = document.querySelector(`#auditTable tr[data-seq="${e.audit_seq}"]`);
+      if (row) { row.scrollIntoView({ behavior: "smooth", block: "center" }); row.classList.add("highlight"); 
+        setTimeout(() => row.classList.remove("highlight"), 2000); }
+    }, 100); }
+  }, `audit #${e.audit_seq || '?'} · ${String(e.hash || "").slice(0, 6)}`);
+  
   const el = h("div", { class: `ln ${e.msg.startsWith("▶") ? "stagehead" : ""} ${hasData ? "hasdata" : ""} ${e.level === "deny" ? "deny" : ""} ${e.moment ? "mom" : ""}`, "data-seq": e.seq, "data-audit": e.audit_seq },
-    h("span", { class: "seq", title: `Log #${e.seq}, Audit row ${e.audit_seq || '?'}` }, e.audit_seq || e.seq), h("span", { class: "tm" }, hhmmss(e.t)),
+    h("span", { class: "seq", title: `Log #${e.seq}` }, e.seq), h("span", { class: "tm" }, hhmmss(e.t)),
     h("span", { class: `lv lv-${e.level}`, title: LEVEL_TIPS[e.level] }, e.level),
     h("span", { class: "msg" }, e.moment ? h("span", { class: `tag ${e.moment}`, title: "a moment: " + e.moment }, "★ " + e.moment) : null, e.msg),
-    h("span", { class: "hash", title: `audit row #${e.audit_seq}\nsha256 ${e.hash}` }, `#${e.audit_seq} ${String(e.hash || "").slice(0, 8)}`));
+    auditBadge);
   if (hasData) el.querySelector(".msg").onclick = () => {
     const d = el.querySelector(".data"); if (d) return d.remove();
     el.append(h("div", { class: "data" }, JSON.stringify(e.data, null, 2)));
