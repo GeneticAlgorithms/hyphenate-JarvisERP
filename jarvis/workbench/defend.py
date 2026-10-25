@@ -149,7 +149,8 @@ def _check_concession(question: str, it: dict) -> dict | None:
         amt_match = re.search(r'\$\s?([\d,]+(?:\.\d{2})?)', question)
         if amt_match:
             new_amt = float(amt_match.group(1).replace(",", "")) * 100
-            proposal_amt = sum(abs(l.get("cents", 0)) for l in it["proposal"].get("lines", []))
+            # Sum debits only to get transaction amount (not double-counting)
+            proposal_amt = sum(l.get("cents", 0) for l in it["proposal"].get("lines", []) if l.get("cents", 0) > 0)
             if abs(new_amt - proposal_amt) > 100:  # More than $1 difference
                 return {
                     "concede": True,
@@ -243,8 +244,8 @@ def defend(run, it, question: str) -> dict:
             # Immediately re-propose with corrected data
             corrected_proposal = dict(it["proposal"])
             if "new_amount" in concession:
-                # Adjust amounts proportionally
-                old_total = sum(abs(l.get("cents", 0)) for l in corrected_proposal.get("lines", []))
+                # Adjust amounts proportionally (use debits only to get the real transaction amount)
+                old_total = sum(l.get("cents", 0) for l in corrected_proposal.get("lines", []) if l.get("cents", 0) > 0)
                 scale = concession["new_amount"] / old_total if old_total > 0 else 1.0
                 for line in corrected_proposal.get("lines", []):
                     if line.get("cents", 0) != 0:
