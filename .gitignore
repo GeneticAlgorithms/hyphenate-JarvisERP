@@ -218,3 +218,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- JarvisERP ---
+CREDENTIALS.md
+.env
+!.env.example
+/data/worlds/
+/runtime/
+node_modules/
