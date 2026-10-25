@@ -25,8 +25,11 @@ def _keywords(it):
     return [t for t in toks if t.lower() not in STOP]
 
 
-def _evidence(run, it, n=4):
+def _evidence(run, it, n=4, question: str = ""):
     kws = [k.lower() for k in _keywords(it)]
+    # Extract keywords from question to focus evidence
+    question_kws = [w.lower() for w in re.findall(r'\b[A-Za-z]{4,}\b', question)][:8] if question else []
+    
     # Scope evidence to this item: extract amounts, accounts, vendors from proposal
     pr = it.get("proposal") or {}
     lines = pr.get("lines") or []
@@ -39,14 +42,18 @@ def _evidence(run, it, n=4):
                 or e["msg"].startswith(("Proposed", "Challenge", "①", "②", "③")):
             continue
         m = e["msg"].lower()
-        # Keyword match
+        
+        # Question-specific scoring
+        q_score = sum(1 for k in question_kws if k in m)
+        
+        # Keyword match from item title
         kw_score = sum(1 for k in kws if k in m)
         # Amount match (if log mentions same dollar amount)
         amt_score = sum(1 for amt in item_amounts if f"{amt/100:.2f}" in m or f"${amt//100}" in m)
         # Account match
         acct_score = sum(1 for acct in item_accounts if acct in m)
         
-        score = kw_score + amt_score * 2 + acct_score * 2 + (1 if e.get("moment") else 0)
+        score = q_score * 3 + kw_score + amt_score * 2 + acct_score * 2 + (1 if e.get("moment") else 0)
         if score:
             hits.append((score, e))
     hits.sort(key=lambda x: (-x[0], x[1]["seq"]))
@@ -180,12 +187,18 @@ def _address(question, it):
         return ("Materiality decides whether a misstatement matters, not how to classify a transaction."
                 + (" The personal purchase is a control issue, and ruling P-0317 applies regardless of size." if personal else ""))
     elif challenge_type == "policy":
-        # Give specific policy/precedent answer with history
-        if kind == "bank_categorize" or kind == "paypal_split":
-            policy_refs = it.get("policy_id") or "current policy"
-            precedent_refs = ", ".join(it.get("precedent_ids", [])) if it.get("precedent_ids") else "none"
+        # Give specific policy/precedent answer with history, including P-0317
+        policy_refs = it.get("policy_id") or "current policy"
+        precedent_refs = it.get("precedent_ids", [])
+        personal = any(l["acct"] == "1250" for l in lines)
+        
+        if kind in ("bank_categorize", "paypal_split"):
+            prec_text = f"precedents: {', '.join(precedent_refs)}" if precedent_refs else "precedents: none"
+            policy_note = ""
+            if personal or "P-0317" in policy_refs or any("P-0317" in str(p) for p in precedent_refs):
+                policy_note = " Per ruling P-0317 (March 2026), personal purchases go to 1250 Employee Receivable regardless of amount."
             return (f"Last month's categorization isn't a binding precedent for a different transaction. "
-                    f"This decision follows {policy_refs} (precedents: {precedent_refs}). "
+                    f"This decision follows {policy_refs} ({prec_text}).{policy_note} "
                     f"The documents for this transaction — the SOW, receipt, and payment record — point to these specific accounts.")
         return "Last month's habit isn't evidence about this month's transaction. The documents for this one point elsewhere."
     elif challenge_type == "period":
@@ -324,7 +337,7 @@ def defend(run, it, question: str) -> dict:
     
     points = [_address(question, it)]
     run.log("decide", f"① {points[-1]}", pause=0.8)
-    for e in _evidence(run, it):
+    for e in _evidence(run, it, n=4, question=question):
         points.append(f"Log #{e['seq']} ({e['hash'][:8]}): {e['msg']}")
         run.log("decide", f"② evidence — log #{e['seq']} · audit {e['hash'][:8]}: {e['msg'][:220]}", {"cites": e["seq"]}, pause=0.6)
     cf = _counterfactual(run, it)
