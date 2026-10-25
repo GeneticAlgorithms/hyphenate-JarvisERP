@@ -226,12 +226,13 @@ def apply(r, it):
 
 def on_reject(r, it, reason):
     """Handle Controller rejection - record as precedent and re-plan."""
-    from jarvis.work.db import exec_sql
-    
     # Record the rejection as a precedent
-    exec_sql(r.wb.db, 
-            "INSERT INTO precedents (date, kind, question, answer, item_id, created_at) VALUES (?, ?, ?, ?, ?, datetime('now'))",
-            (it.get("period", "2026-09"), it["kind"], it["title"], reason[:500], it["item_id"]))
+    prec_id = f"PREC-{abs(hash(it['item_id'] + reason)) % 10**6:06d}"
+    r.wb.db.conn.execute(
+        "INSERT INTO precedents (prec_id, date, period, pattern, summary, decision, decided_by, status, refs, source_item) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (prec_id, "2026-09-30", it.get("period", "2026-09"), it["kind"], it["title"][:200], reason[:500], "maya", "active", "[]", it["item_id"])
+    )
     
     r.log("decide", f"Controller rejected: \"{reason}\". Recorded as precedent; will apply in future similar transactions.", pause=0.8)
     

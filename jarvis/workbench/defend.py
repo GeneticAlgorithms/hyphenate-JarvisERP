@@ -218,9 +218,8 @@ def defend(run, it, question: str) -> dict:
     # Check for concession - if evidence contradicts, withdraw immediately
     concession = _check_concession(question, it)
     if concession:
-        from jarvis.work.transition import transition, create_item
+        from jarvis.work.transition import transition, create_item, now
         from jarvis.work.roles import actor
-        from jarvis.work.db import exec_sql
         from jarvis.agent.context import SYNC
         
         try:
@@ -231,9 +230,12 @@ def defend(run, it, question: str) -> dict:
                       reason=f"Conceding: {concession['reason']}")
             
             # Record as precedent
-            exec_sql(run.wb.db, 
-                    "INSERT INTO precedents (date, kind, question, answer, item_id, created_at) VALUES (?, ?, ?, ?, ?, datetime('now'))",
-                    ("2026-09", it["kind"], question[:500], concession["reason"], it["item_id"]))
+            prec_id = f"PREC-{abs(hash(question)) % 10**6:06d}"
+            run.wb.db.conn.execute(
+                "INSERT INTO precedents (prec_id, date, period, pattern, summary, decision, decided_by, status, refs, source_item) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (prec_id, "2026-09-30", "2026-09", it["kind"], question[:200], concession["reason"], "maya", "active", "[]", it["item_id"])
+            )
             
             run.log("decide", f"**CONCEDING**: {concession['reason']}", pause=1.0)
             run.log("decide", "Precedent recorded. Re-proposing with correction...", pause=0.5)
