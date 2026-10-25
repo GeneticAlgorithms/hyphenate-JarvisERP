@@ -701,7 +701,7 @@ def inject(session, text: str | None = None, template: str | None = None, params
         v = _match_vendor(params.get("vendor", ""))
         
         if v:
-            cents = int(params["amount"] * 100)
+            cents = _dollars_to_cents(params["amount"])
             d = params["date"]
             anchor = f"inject:bank_change:{tag}:{v['id']}"
             
@@ -782,7 +782,7 @@ def inject(session, text: str | None = None, template: str | None = None, params
         # Create ALL N charges first
         with db.tx():
             for i, amt in enumerate(amounts):
-                cents = int(amt * 100)
+                cents = _dollars_to_cents(amt)
                 if source == "Ramp":
                     rid = f"inj-split-{tag}-{i}"
                     _upsert(db, "ramp", rid, "card_txn", d, cents, "USD", merchant,
@@ -811,7 +811,7 @@ def inject(session, text: str | None = None, template: str | None = None, params
         
         # Now create the work item flagging this as threshold avoidance
         anchor = f"inject:split:{tag}"
-        total_cents = sum(int(a * 100) for a in amounts)
+        total_cents = sum(_dollars_to_cents(a) for a in amounts)
         it = create_item(db, SYNC, "threshold_split", anchor, 
                         f"ESCALATE: {count} purchases to {merchant} on {d}, each under ${approval_limit:.2f} limit (total ${total_cents/100:.2f})",
                         d[:7], record_ids)
@@ -837,7 +837,7 @@ def inject(session, text: str | None = None, template: str | None = None, params
     elif template == "ghost_vendor":
         # Block payment to vendor with no W-9/SOW or whose details match employee
         vendor_name = params.get("vendor", "Advanced Solutions Inc")
-        cents = int(params["amount"] * 100)
+        cents = _dollars_to_cents(params["amount"])
         d = params.get("date", "2026-09-22")
         
         # Check if vendor is in vendor master
@@ -900,7 +900,7 @@ def inject(session, text: str | None = None, template: str | None = None, params
     elif template == "refund_as_revenue":
         # Customer refund incorrectly booked as revenue - flag for review, NOT direct post
         merchant = params.get("merchant", "Bay Rig Rentals")
-        cents = int(params["amount"] * 100)
+        cents = _dollars_to_cents(params["amount"])
         # For free text, use parsed date or default to Sep end; for template use template default
         d = params.get("date", "2026-09-27" if not from_free_text else "2026-09-27")
         
