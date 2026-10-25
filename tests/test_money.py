@@ -1,6 +1,7 @@
-"""Unit tests for money.py to_cents() handling of integers."""
+"""Unit tests for money.py to_cents() and injector _dollars_to_cents()."""
 import pytest
 from jarvis.money import to_cents
+from jarvis.agent.injector import _dollars_to_cents
 
 
 def test_to_cents_with_float():
@@ -17,13 +18,29 @@ def test_to_cents_with_int_returns_as_is():
     assert to_cents(9600) == 9600
 
 
-def test_llm_amount_normalization():
-    """LLM amounts should be normalized to float before to_cents."""
-    # In inject(), we normalize: int -> float before to_cents
-    # Simulating: llm_result["amount"] = float(96) -> 96.0
-    llm_amount = 96  # LLM returns int dollars
-    normalized = float(llm_amount)  # Normalize to float
-    assert to_cents(normalized) == 9600  # Now correct
-    
-    # Without normalization, int is treated as cents
-    assert to_cents(llm_amount) == 96  # Wrong!
+def test_to_cents_with_string():
+    """to_cents with string should parse and return cents."""
+    assert to_cents("96.40") == 9640
+    assert to_cents("$1,234.56") == 123456
+    assert to_cents("1234") == 123400
+
+
+def test_dollars_to_cents_with_int():
+    """_dollars_to_cents treats int as dollars, not cents."""
+    assert _dollars_to_cents(96) == 9600
+    assert _dollars_to_cents(1234) == 123400
+    assert _dollars_to_cents(18400) == 1840000
+
+
+def test_dollars_to_cents_with_float():
+    """_dollars_to_cents treats float as dollars."""
+    assert _dollars_to_cents(96.0) == 9600
+    assert _dollars_to_cents(1234.56) == 123456
+    assert _dollars_to_cents(18400.0) == 1840000
+
+
+def test_dollars_to_cents_with_string():
+    """_dollars_to_cents handles string amounts."""
+    assert _dollars_to_cents("96") == 9600
+    assert _dollars_to_cents("1234.56") == 123456
+    assert _dollars_to_cents("$1,234.56") == 123456

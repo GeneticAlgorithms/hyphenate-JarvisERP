@@ -11,6 +11,15 @@ from jarvis.agent import llm
 from jarvis.agent.context import JARVIS
 from jarvis.money import fmt, to_cents
 from jarvis.work import events
+
+
+def _dollars_to_cents(amount) -> int:
+    """Convert any amount representation (int, float, str) to cents, treating numbers as dollars."""
+    if isinstance(amount, str):
+        # String like "$1,234.56" - let to_cents handle it
+        return to_cents(amount)
+    # Treat int and float as dollars, not cents
+    return to_cents(float(amount))
 from jarvis.work.db import J
 from jarvis.work.roles import actor
 from jarvis.work.sync import _upsert
@@ -574,7 +583,7 @@ def inject(session, text: str | None = None, template: str | None = None, params
         return {"error": str(e), "text": text, "items": []}
 
     if template == "unknown_debit":
-        cents = -abs(to_cents(params["amount"]))
+        cents = -abs(_dollars_to_cents(params["amount"]))
         desc = params["description"]
         d = params["date"]
         us = f"{d[5:7]}/{d[8:10]}/{d[:4]}"
@@ -586,7 +595,7 @@ def inject(session, text: str | None = None, template: str | None = None, params
         for it in eng.discover(d[:7]):
             created.append(eng.process_item(it, "bank_line"))
     elif template == "personal_card":
-        cents = abs(to_cents(params["amount"]))
+        cents = abs(_dollars_to_cents(params["amount"]))
         rid = f"inj-{tag}"
         with db.tx():
             _upsert(db, "ramp", rid, "card_txn", params["date"], cents, "USD", params["merchant"].split(" #")[0].title(),
@@ -606,7 +615,7 @@ def inject(session, text: str | None = None, template: str | None = None, params
         for it, kind, payload in eng.discover_reviews(params["date"][:7]):
             created.append(eng.process_item(it, kind, payload))
     elif template == "duplicate_bill":
-        cents = abs(to_cents(params["amount"]))
+        cents = abs(_dollars_to_cents(params["amount"]))
         v = next((x for x in bible.VENDORS if x["qbo_name"] == params["vendor"]), None)
         vid = v["id"] if v else db.one("SELECT vendor_id FROM vendors WHERE qbo_name=?", (params["vendor"],))["vendor_id"]
         rid = f"inj-{tag}"
@@ -652,7 +661,7 @@ def inject(session, text: str | None = None, template: str | None = None, params
                     "items": [{"item_id": c["item_id"], "state": c["state"], "kind": c["kind"], "title": c["title"],
                               "rationale": c.get("rationale", ""), "parser": params.get("_parser", "deterministic")} for c in created]}
         
-        cents = abs(to_cents(params["amount"]))
+        cents = abs(_dollars_to_cents(params["amount"]))
         bill_id = f"BILL-INJ-{tag}"
         bje = f"JE-INJB-{tag}"
         bill_exists = False
@@ -950,7 +959,7 @@ def inject(session, text: str | None = None, template: str | None = None, params
             for p in params["payments"]:
                 pid = _id(tag, p["name"], p.get("item"))[:17]
                 if "eur" in p:
-                    eur = to_cents(p["eur"])
+                    eur = _dollars_to_cents(p["eur"])
                     usd = round(eur * rate * 1.041)
                     _upsert(db, "paypal", pid, "paypal_general_payment", d, -eur, "EUR", p["name"],
                             f"General Payment {p['name']} {p.get('item', '')}",
@@ -963,7 +972,7 @@ def inject(session, text: str | None = None, template: str | None = None, params
                             "General Currency Conversion", {"txn_id": cid, "type": "General Currency Conversion",
                                                             "ref": pid, "time": "10:00:00"}, {"injected": True}, "injector", 0)
                 else:
-                    usd = to_cents(p["usd"])
+                    usd = _dollars_to_cents(p["usd"])
                     _upsert(db, "paypal", pid, "paypal_preapproved_payment_bill_user_payment", d, -usd, "USD", p["name"],
                             f"PreApproved Payment {p['name']} {p.get('item', '')}",
                             {"txn_id": pid, "type": "PreApproved Payment Bill User Payment", "time": "10:05:00",

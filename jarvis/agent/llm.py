@@ -14,6 +14,10 @@ _selected_models = None  # cache: {"fast": model_id, "reasoning": model_id}
 
 
 def available() -> bool:
+    import os
+    llm_env = os.getenv("JARVIS_LLM", "").lower()
+    if llm_env in ("off", "false", "0", "no"):
+        return False
     return bool(config.ANTHROPIC_API_KEY)
 
 
