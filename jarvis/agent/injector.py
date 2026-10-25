@@ -222,6 +222,64 @@ def inject(session, text: str | None = None, template: str | None = None, params
         before = {r["item_id"] for r in db.q("SELECT item_id FROM work_items")}
         eng.run_october()
         created = [get_item(db, r["item_id"]) for r in db.q("SELECT item_id FROM work_items") if r["item_id"] not in before]
+    
+    elif template == "vendor_bank_change":
+        # Freeze payment work item, mark NEEDS_INFO, request callback
+        v = next((x for x in bible.VENDORS if x["qbo_name"] == params["vendor"]), None)
+        if v:
+            with db.tx():
+                anchor = f"inject:bank_change:{tag}"
+                it = create_item(db, SYNC, "bank_change", anchor, f"Vendor {params['vendor']} changed bank details before ${params['amount']/100:.2f} payment",
+                                "2026-09", [])
+                patch = {"alert": f"Vendor {params['vendor']} emailed new bank details before payment", "amount_cents": int(params['amount'] * 100),
+                         "requires": "callback_verification", "injected": text or template}
+                transition(db, it["item_id"], "needs_info", JARVIS, patch, reason="Bank detail change requires verification call")
+                created.append(it)
+    
+    elif template == "split_purchases":
+        # Create N charges, flag threshold splitting
+        count = params.get("count", 3)
+        amt_each = params["amount"] / count
+        with db.tx():
+            for i in range(count):
+                rid = f"inj-split-{tag}-{i}"
+                _upsert(db, "ramp", rid, "card_txn", params["date"], int(amt_each * 100), "USD", params.get("vendor", "Office Depot"),
+                       f"Purchase {i+1}/{count}", {"ramp_id": rid, "settle": params["date"], "merchant": params.get("vendor", "Office Depot"),
+                                                   "descriptor": f"Purchase {i+1}/{count}", "cardholder": params.get("cardholder", "J. Ortiz"),
+                                                   "last4": "8812", "mcc": "5943", "department": "Live", "category": "Supplies",
+                                                   "memo": f"Split {i+1}/{count}", "receipt": "Yes", "threshold_split": True},
+                       {"injected": text or template, "threshold_split": True}, "injector", 0)
+            anchor = f"inject:split:{tag}"
+            it = create_item(db, SYNC, "threshold_split", anchor, f"{count} purchases of ~${amt_each:.2f} each to {params.get('vendor', 'vendor')} on {params['date']} (total ${params['amount']:.2f})",
+                            "2026-09", [])
+            patch = {"count": count, "amount_each": int(amt_each * 100), "total_cents": int(params['amount'] * 100),
+                     "vendor": params.get("vendor", "Office Depot"), "flagged_for_review": True, "injected": text or template}
+            transition(db, it["item_id"], "needs_info", JARVIS, patch, reason=f"Multiple charges under approval limit suggest threshold avoidance")
+            created.append(it)
+    
+    elif template == "ghost_vendor":
+        # Payment to non-existent vendor
+        with db.tx():
+            anchor = f"inject:ghost:{tag}"
+            it = create_item(db, SYNC, "ghost_vendor", anchor, f"Payment to '{params.get('vendor', 'Advanced Solutions Inc')}' for ${params['amount']:.2f} but vendor not in master",
+                            "2026-09", [])
+            patch = {"vendor_name": params.get("vendor", "Advanced Solutions Inc"), "amount_cents": int(params['amount'] * 100),
+                     "date": params["date"], "no_w9": True, "no_contract": True, "requires": "vendor_verification", "injected": text or template}
+            transition(db, it["item_id"], "needs_info", JARVIS, patch, reason="Payment to vendor not in master; no W-9 or contract on file")
+            created.append(it)
+    
+    elif template == "refund_as_revenue":
+        # Refund booked as revenue instead of contra-expense
+        cents = int(params['amount'] * 100)
+        with db.tx():
+            anchor = f"inject:refund:{tag}"
+            it = create_item(db, SYNC, "refund_misclass", anchor, f"+${params['amount']:.2f} from {params.get('merchant', 'Stripe')} is a refund, not revenue",
+                            "2026-09", [])
+            patch = {"merchant": params.get("merchant", "Stripe"), "amount_cents": cents, "date": params["date"],
+                     "booked_to": "4950", "should_be": "contra_expense", "injected": text or template}
+            transition(db, it["item_id"], "needs_info", JARVIS, patch, reason="Credit classified as revenue; should be contra-expense/refund")
+            created.append(it)
+    
     elif template == "paypal_bundle":
         d = params["date"]
         rate = session.ctx.fx(d) or 1.17
