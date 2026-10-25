@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JarvisERP — Autonomous Staff Accountant · Cal Hacks 2026</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%237a1414'/><rect x='6' y='8' width='4' height='20' fill='%23fa6610' rx='1'/><rect x='14' y='12' width='4' height='16' fill='%23fa6610' rx='1'/><rect x='22' y='8' width='4' height='20' fill='%23fa6610' rx='1'/></svg>">
+  <link rel="stylesheet" href="./src/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="nav-content">
+      <div class="brand">
+        <div class="mark">
+          <i></i><i></i><i></i><i></i>
+        </div>
+        <span class="name">Jarvis<span>ERP</span></span>
+      </div>
+      <div class="nav-actions">
+        <button class="btn-ghost" id="presentBtn">Present Mode</button>
+        <a href="http://localhost:8000" class="btn-primary" target="_blank">Open Live Product →</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Progress indicator -->
+  <div class="progress-bar" id="progressBar"></div>
+
+  <!-- Sections -->
+  <main id="main">
+    
+    <!-- Section 0: Hero -->
+    <section id="hero" class="section hero-section">
+      <div class="container">
+        <div class="eyebrow">Cal Hacks 2026 · Hyphenate Track</div>
+        <h1 class="hero-title">
+          An autonomous <span class="highlight">Staff Accountant</span><br/>
+          you could actually hire
+        </h1>
+        <p class="hero-subtitle">
+          JarvisERP fills Afterglow Labs' Staff Accountant seat.<br/>
+          It reconciles three systems that never agree, books accruals, keeps vendors deduplicated —<br/>
+          and <strong>cannot post anything its human Controller hasn't approved</strong>.
+        </p>
+        <div class="hero-credits">
+          <p class="credit-line">Built solo by Alexander Le · UC Berkeley, with Cursor and Grok Bot</p>
+          <p class="inspiration-line">Inspired by my boyfriend, an accountant. Over dinner I kept hearing how stressful the month-end close is for him. These are the real pain points he deals with.</p>
+        </div>
+        <div class="hero-cta">
+          <a href="http://localhost:8000" class="btn-primary large" target="_blank">Try the Live Demo</a>
+          <button class="btn-ghost large" onclick="document.getElementById('moment').scrollIntoView({behavior: 'smooth'})">
+            See the Moment ↓
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 1: The Moment -->
+    <section id="moment" class="section moment-section">
+      <div class="container">
+        <div class="section-header">
+          <div class="eyebrow">01 · The Moment</div>
+          <h2>One bank line, <span class="highlight">four transactions</span> to the cent</h2>
+        </div>
+        
+        <div class="moment-content">
+          <!-- Bank line animation -->
+          <div class="bank-line-card" id="bankLine">
+            <div class="card-header">
+              <span class="mono-label">SEPTEMBER BANK FEED</span>
+            </div>
+            <div class="bank-line">
+              <span class="date">09/18</span>
+              <span class="desc">PAYPAL *INST XFER DCE4343478</span>
+              <span class="amount negative">-$3,912.44</span>
+            </div>
+            <div class="naive-rule" id="naiveRule">
+              <div class="rule-stamp">
+                <span class="label">Bank Feed Rule:</span>
+                <span class="value">PayPal → Software Expense</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Isometric split stack -->
+          <div class="split-visual">
+            <div class="split-arrow">↓</div>
+            <p class="split-label">Jarvis decomposes the line:</p>
+          </div>
+
+          <div class="card-stack" id="momentStack">
+            <div class="stacked-card" id="momentCard1" style="--fan-offset: 0;">
+              <div class="entry-amount">$3,451.50</div>
+              <div class="entry-desc">1310 · Prepaid Tour Costs</div>
+              <div class="entry-detail">Kraftwerk Rigging · Berlin Nov 14 show · €2,950 @ ECB 1.1700</div>
+              <div class="entry-tag">Cut-off: future period</div>
+            </div>
+
+            <div class="stacked-card" id="momentCard2" style="--fan-offset: 1;">
+              <div class="entry-amount">$147.50</div>
+              <div class="entry-desc">6810 · Bank & FX Fees</div>
+              <div class="entry-detail">PayPal spread · actual 1.2200 vs market 1.1700</div>
+              <div class="entry-tag">FX fee</div>
+            </div>
+
+            <div class="stacked-card" id="momentCard3" style="--fan-offset: 2;">
+              <div class="entry-amount">$200.00</div>
+              <div class="entry-desc">6410 · Software Subscriptions</div>
+              <div class="entry-detail">Vendor: Anthropic (linked alias "Claude")</div>
+              <div class="entry-tag">Vendor deduplication</div>
+            </div>
+
+            <div class="stacked-card" id="momentCard4" style="--fan-offset: 3;">
+              <div class="entry-amount">$113.44</div>
+              <div class="entry-desc">1250 · Employee Receivable</div>
+              <div class="entry-detail">J. Ortiz · Steam purchase · Policy P-0317</div>
+              <div class="entry-tag">Personal purchase</div>
+            </div>
+          </div>
+
+          <div class="total-line">
+            <span>Total:</span>
+            <span class="amount">$3,912.44</span>
+            <span class="check">✓ Balanced to the cent</span>
+          </div>
+
+          <!-- Challenge & Defense -->
+          <div class="challenge-section" id="challengeSection">
+            <div class="challenge-intro">
+              <p>Click below to see how Jarvis handles challenges</p>
+            </div>
+            
+            <div class="challenge-buttons">
+              <button class="btn-challenge" id="challengeBtn">Challenge It</button>
+              <button class="btn-challenge" id="newEvidenceBtn" style="display:none;">New Evidence: Show Moved to Sep 28</button>
+            </div>
+
+            <div class="challenge-card" id="challengeCard" style="display:none;">
+              <div class="challenge-header">
+                <span class="actor-label">Controller challenges:</span>
+              </div>
+              <div class="challenge-text">
+                "Why not just expense it all like we always do with PayPal? It's under materiality."
+              </div>
+            </div>
+
+            <div class="defense-card" id="defenseCard" style="display:none;">
+              <div class="defense-header">
+                <span class="actor-label">Jarvis defends:</span>
+              </div>
+              <div class="defense-text">
+                <p><strong>1. The prepaid deposit</strong> relates to a November show. Expensing it now overstates September opex by $3,451.50 and violates cut-off.</p>
+                <p><strong>2. The personal purchase</strong> is a control issue. Policy P-0317 (March ruling) requires it goes to Employee Receivable regardless of amount.</p>
+                <p><strong>3. Vendor deduplication:</strong> Creating a new "Claude" vendor when Anthropic exists adds complexity and breaks reporting.</p>
+                <p class="evidence">Evidence: SOW Berlin-Nov-14.pdf · log hash 0x1a3f8b · P-0317 approved by M. Chen</p>
+              </div>
+            </div>
+
+            <div class="concession-card" id="concessionCard" style="display:none;">
+              <div class="concession-header">
+                <span class="actor-label">Jarvis concedes & re-proposes:</span>
+              </div>
+              <div class="concession-text">
+                <p><strong>New evidence accepted.</strong> The Berlin show was moved from November 14 to September 28 (email Sept 15).</p>
+                <p><strong>Updated entry:</strong></p>
+                <div class="concession-entry">
+                  <div class="entry-line"><span class="account">6310 Tour Production Costs</span> <span class="amount">$3,451.50</span></div>
+                  <div class="entry-line"><span class="account">6810 Bank & FX Fees</span> <span class="amount">$147.50</span></div>
+                  <div class="entry-line"><span class="account">6410 Software</span> <span class="amount">$200.00</span></div>
+                  <div class="entry-line"><span class="account">1250 Employee Receivable</span> <span class="amount">$113.44</span></div>
+                  <div class="entry-line credit"><span class="account">1010 Cash</span> <span class="amount">$3,912.44</span></div>
+                </div>
+                <p class="concession-note">Prepaid → Expense. Ready for Controller approval.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 2: Meet the Company -->
+    <section id="company" class="section company-section">
+      <div class="container">
+        <div class="section-header">
+          <div class="eyebrow">02 · The Company</div>
+          <h2><span class="highlight">Afterglow Labs</span> — where accounting gets messy</h2>
+        </div>
+        
+        <div class="company-content">
+          <div class="company-card">
+            <div class="company-icon">🎵</div>
+            <h3>Audio-Visual Touring Studio</h3>
+            <p>28-person Bay Area studio producing live-visual shows for festivals and clubs.</p>
+          </div>
+
+          <div class="seats-filled">
+            <h3>Seat Jarvis Fills</h3>
+            <div class="seat-grid">
+              <div class="seat-card seat-card-solo">
+                <div class="seat-title">Staff Accountant</div>
+                <div class="seat-desc">Cash & expense close, reconciliation, accruals, vendor deduplication</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 3: Three Systems -->
+    <section id="systems" class="section systems-section">
+      <div class="container">
+        <div class="section-header">
+          <div class="eyebrow">03 · The Problem</div>
+          <h2>Three systems that <span class="highlight">never agree</span></h2>
+        </div>
+
+        <div class="systems-content">
+          <div class="system-shapes" id="systemShapes">
+            <div class="system-shape bank-shape" id="bankShape">
+              <div class="shape-label">Bank Feed</div>
+              <div class="shape-value">$3,912.44</div>
+              <div class="shape-desc">"PAYPAL INST XFER"</div>
+            </div>
+
+            <svg class="connector mismatch-connector" id="connector1" width="100" height="60">
+              <path d="M 10 30 Q 50 10, 90 30" stroke="#c62828" stroke-width="3" fill="none" stroke-dasharray="5,5"/>
+              <text x="50" y="50" text-anchor="middle" fill="#c62828" font-size="12">✗</text>
+            </svg>
+
+            <div class="system-shape ledger-shape" id="ledgerShape">
+              <div class="shape-label">Ledger (QBO)</div>
+              <div class="shape-value">$3,912.44</div>
+              <div class="shape-desc">"Software Expense"</div>
+            </div>
+
+            <svg class="connector mismatch-connector" id="connector2" width="100" height="60">
+              <path d="M 10 30 Q 50 50, 90 30" stroke="#c62828" stroke-width="3" fill="none" stroke-dasharray="5,5"/>
+              <text x="50" y="20" text-anchor="middle" fill="#c62828" font-size="12">✗</text>
+            </svg>
+
+            <div class="system-shape paypal-shape" id="paypalShape">
+              <div class="shape-label">PayPal Detail</div>
+              <div class="shape-value">4 payments</div>
+              <div class="shape-desc">€2,950 + $147.50 + $200 + $113.44</div>
+            </div>
+          </div>
+
+          <div class="discrepancy-highlight" id="discrepancyHighlight">
+            <div class="disc-icon">⚠</div>
+            <div class="disc-text">
+              <strong>The discrepancy:</strong> Bank says one thing, PayPal shows another, Ledger guesses wrong.
+            </div>
+          </div>
+
+          <div class="solution-panel" id="solutionPanel">
+            <div class="sol-header">Jarvis makes them fit</div>
+            <div class="sol-grid">
+              <div class="sol-item">
+                <strong>Trust hierarchy:</strong> Bank for cash movement → PayPal for detail → Vendor contracts for context
+              </div>
+              <div class="sol-item">
+                <strong>Cross-validate:</strong> Subset-sum match, FX rates from ECB, amounts tie to the cent
+              </div>
+              <div class="sol-item">
+                <strong>Escalate conflicts:</strong> When evidence disagrees, ask the Controller
+              </div>
+            </div>
+            
+            <!-- Connectors showing the fit -->
+            <div class="fit-connectors" id="fitConnectors" style="display:none;">
+              <svg width="100%" height="100">
+                <line x1="20%" y1="50" x2="40%" y2="50" stroke="#2f7d4a" stroke-width="3"/>
+                <line x1="50%" y1="50" x2="70%" y2="50" stroke="#2f7d4a" stroke-width="3"/>
+                <circle cx="30%" cy="50" r="8" fill="#2f7d4a"/>
+                <circle cx="60%" cy="50" r="8" fill="#2f7d4a"/>
+                <text x="50%" y="80" text-anchor="middle" fill="#2f7d4a" font-size="14" font-weight="600">✓ All sources reconciled</text>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 4: Five Problems -->
+    <section id="problems" class="section problems-section">
+      <div class="container">
+        <div class="section-header">
+          <div class="eyebrow">04 · Five Real Problems</div>
+          <h2>What an accountant <span class="highlight">faces every close</span></h2>
+        </div>
+
+        <div class="problems-grid">
+          <!-- Problem 1: Timing -->
+          <div class="problem-card" data-problem="1">
+            <div class="problem-number">01</div>
+            <div class="problem-title">Timing Differences & Accruals</div>
+            <div class="problem-layers">
+              <div class="layer layer-problem">
+                <div class="layer-label">Problem</div>
+                <div class="layer-text">Interest earned Sep 30, deposited Oct 1 → where does it go?</div>
+              </div>
+              <div class="layer layer-manual">
+                <div class="layer-label">Manual Today</div>
+                <div class="layer-text">Log into bank, check interest notice, estimate, book accrual, reverse next month</div>
+              </div>
+              <div class="layer layer-jarvis">
+                <div class="layer-label">Jarvis Catches</div>
+                <div class="layer-text">OCR reads notice "$1,042.17" (fixing "1,O42.17"), accrues to Other Receivable</div>
+              </div>
+              <div class="layer layer-settled">
+                <div class="layer-label">How Settled</div>
+                <div class="layer-text">Auto-reverses Oct 1 when deposit clears, zero variance</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Problem 2: Package Roll-forward -->
+          <div class="problem-card" data-problem="2">
+            <div class="problem-number">02</div>
+            <div class="problem-title">Rolling Forward the Financial Package</div>
+            <div class="problem-layers">
+              <div class="layer layer-problem">
+                <div class="layer-label">Problem</div>
+                <div class="layer-text">New GL account 6455 appears mid-year. Excel package needs manual update.</div>
+              </div>
+              <div class="layer layer-manual">
+                <div class="layer-label">Manual Today</div>
+                <div class="layer-text">Download 3 QBO exports, add columns, add rows, fix formulas, check ties</div>
+              </div>
+              <div class="layer layer-jarvis">
+                <div class="layer-label">Jarvis Catches</div>
+                <div class="layer-text">Detects new account 6455, inserts row, extends formulas, ties out automatically</div>
+              </div>
+              <div class="layer layer-settled">
+                <div class="layer-label">How Settled</div>
+                  <div class="layer-text">Late QBO change? Re-downloads, hash-diffs exact cells changed, rebuilds automatically</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Problem 3: Vague Bank Transactions -->
+          <div class="problem-card" data-problem="3">
+            <div class="problem-number">03</div>
+            <div class="problem-title">Vague Bank Transactions</div>
+            <div class="problem-layers">
+              <div class="layer layer-problem">
+                <div class="layer-label">Problem</div>
+                <div class="layer-text">Bank feed says "PAYPAL" → what was actually bought?</div>
+              </div>
+              <div class="layer layer-manual">
+                <div class="layer-label">Manual Today</div>
+                <div class="layer-text">Log into PayPal, search by date/amount, match manually, categorize</div>
+              </div>
+              <div class="layer layer-jarvis">
+                <div class="layer-label">Jarvis Catches</div>
+                <div class="layer-text">Auto-retrieves PayPal detail, subset-sum matches 4 payments, cross-checks SOWs</div>
+              </div>
+              <div class="layer layer-settled">
+                <div class="layer-label">How Settled</div>
+                <div class="layer-text">Splits to exact accounts (prepaid, expense, receivable), FX fee isolated</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Problem 4: Evidence & Folders -->
+          <div class="problem-card" data-problem="4">
+            <div class="problem-number">04</div>
+            <div class="problem-title">Saving & Naming Evidence</div>
+            <div class="problem-layers">
+              <div class="layer layer-problem">
+                <div class="layer-label">Problem</div>
+                <div class="layer-text">Downloads folder: "Statement (3).pdf", duplicate, wrong month, unrelated budget</div>
+              </div>
+              <div class="layer layer-manual">
+                <div class="layer-label">Manual Today</div>
+                <div class="layer-text">Open each PDF, figure out what it is, rename, organize into Drive folders</div>
+              </div>
+              <div class="layer layer-jarvis">
+                <div class="layer-label">Jarvis Catches</div>
+                <div class="layer-text">Reads PDF contents, classifies (statement/recon, account, period), dedupes by hash</div>
+              </div>
+              <div class="layer layer-settled">
+                <div class="layer-label">How Settled</div>
+                <div class="layer-text">Auto-names: "2026-09_Chase-4471_Statement.pdf", files to correct folder, logs 3 missing</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Problem 5: Duplicate Vendors -->
+          <div class="problem-card" data-problem="5">
+            <div class="problem-number">05</div>
+            <div class="problem-title">Duplicate Vendors</div>
+            <div class="problem-layers">
+              <div class="layer layer-problem">
+                <div class="layer-label">Problem</div>
+                <div class="layer-text">Ramp suggests "Claude" as new vendor. QBO already has "Anthropic".</div>
+              </div>
+              <div class="layer layer-manual">
+                <div class="layer-label">Manual Today</div>
+                <div class="layer-text">Notice too late, spend split across two vendors, reporting broken</div>
+              </div>
+              <div class="layer layer-jarvis">
+                <div class="layer-label">Jarvis Catches</div>
+                <div class="layer-text">Scores evidence (TIN, domain, product name), links "Claude" → Anthropic as alias</div>
+              </div>
+              <div class="layer layer-settled">
+                <div class="layer-label">How Settled</div>
+                <div class="layer-text">Controller approves merge, unified vendor master, spend reporting accurate</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 5: What Makes It Hard -->
+    <section id="challenges" class="section challenges-section">
+      <div class="container">
+        <div class="section-header">
+          <div class="eyebrow">05 · What Makes It Hard</div>
+          <h2>The <span class="highlight">five forces</span> that test every system</h2>
+        </div>
+
+        <div class="challenges-grid">
+          <div class="challenge-item" data-challenge="1">
+            <div class="challenge-icon">🔄</div>
+            <h3>Sources Disagree</h3>
+            <p>Bank says $3,912.44, PayPal shows 4 payments, vendor email says "around 10k". Which source wins, and why?</p>
+            <div class="challenge-answer">Trust hierarchy: signed contracts beat emails, bank is truth for cash.</div>
+          </div>
+
+          <div class="challenge-item" data-challenge="2">
+            <div class="challenge-icon">⏱</div>
+            <h3>Time Travels</h3>
+            <p>March ruling changes September behavior. Sep accrual reverses in Oct. What you book today affects next quarter.</p>
+            <div class="challenge-answer">Precedent memory: every decision becomes policy, learns from corrections.</div>
+          </div>
+
+          <div class="challenge-item" data-challenge="3">
+            <div class="challenge-icon">👥</div>
+            <h3>Working With Others</h3>
+            <p>Busy Controller, half-done handoffs, vendors who never respond. You can't do it alone.</p>
+            <div class="challenge-answer">Ask at the right moment, escalate when stuck, record every answer.</div>
+          </div>
+
+          <div class="challenge-item" data-challenge="4">
+            <div class="challenge-icon">🔒</div>
+            <h3>Limits & Controls</h3>
+            <p>Segregation of duties: requester can't approve. Locked periods. Materiality thresholds. No shortcuts.</p>
+            <div class="challenge-answer">Limits enforced in code, not prompts. Denied attempts are logged.</div>
+          </div>
+
+          <div class="challenge-item" data-challenge="5">
+            <div class="challenge-icon">📋</div>
+            <h3>Explainable & Accountable</h3>
+            <p>Auditor asks "why?" six months later. You need the full chain: evidence → decision → rationale.</p>
+            <div class="challenge-answer">Hash-chained audit log. Every transition logged with evidence and reason.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 6: Architecture - SIGNATURE ISOMETRIC STACK -->
+    <section id="architecture" class="section architecture-section">
+      <div class="container">
+        <div class="section-header">
+          <div class="eyebrow">06 · System Architecture</div>
+          <h2>Where everything lives and <span class="highlight">how data flows</span></h2>
+          <p class="section-intro">An isometric view of the entire system stack</p>
+        </div>
+
+        <div class="iso-stack" id="isoStack">
+          <!-- Layer 1: Source Systems -->
+          <div class="iso-layer" data-layer="1">
+            <div class="iso-layer-title">Source Systems</div>
+            <div class="iso-layer-content">
+              <div class="iso-item">Chase Bank</div>
+              <div class="iso-item">PayPal</div>
+              <div class="iso-item">Ramp</div>
+              <div class="iso-item">Gusto</div>
+              <div class="iso-item">Email/Drive</div>
+            </div>
+          </div>
+
+          <!-- Layer 2: ERP/QuickBooks -->
+          <div class="iso-layer" data-layer="2">
+            <div class="iso-layer-title">ERP / QuickBooks</div>
+            <div class="iso-layer-content">
+              <div class="iso-item">Bank Feed</div>
+              <div class="iso-item">General Ledger</div>
+              <div class="iso-item">Chart of Accounts</div>
+              <div class="iso-item">AP/AR Subledgers</div>
+              <div class="iso-item">Vendor Master</div>
+            </div>
+          </div>
+
+          <!-- Layer 3: Jarvis System of Work -->
+          <div class="iso-layer" data-layer="3">
+            <div class="iso-layer-title">Jarvis System of Work</div>
+            <div class="iso-layer-content">
+              <div class="iso-item">Work Items</div>
+              <div class="iso-item">Evidence Store</div>
+              <div class="iso-item">Learned Policies</div>
+            </div>
+          </div>
+
+          <!-- Layer 4: Controls -->
+          <div class="iso-layer" data-layer="4">
+            <div class="iso-layer-title">Controls & Gateway</div>
+            <div class="iso-layer-content">
+              <div class="iso-item">Single Gateway</div>
+              <div class="iso-item">Roles & Permissions</div>
+              <div class="iso-item">Audit Chain</div>
+            </div>
+            <div class="denial-flash" id="denialFlash">⛔ Self-approval denied</div>
+          </div>
+
+          <!-- Layer 5: People & Outputs -->
+          <div class="iso-layer" data-layer="5">
+            <div class="iso-layer-title">People & Outputs</div>
+            <div class="iso-layer-content">
+              <div class="iso-item">Controller</div>
+              <div class="iso-item">Auditor</div>
+              <div class="iso-item">Drive Evidence</div>
+              <div class="iso-item">Financial Package</div>
+            </div>
+          </div>
+
+          <!-- Animated transaction packets -->
+          <div class="tx-packet" id="txPacket1"></div>
+          <div class="tx-packet" id="txPacket2"></div>
+        </div>
+
+        <div class="arch-caption">
+          <p>Transaction packets flow upward through each layer. The Gateway (Controls layer) validates every write. Denied self-approvals flash red.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 7: Double-Entry -->
+    <section id="double-entry" class="section double-entry-section">
+      <div class="container">
+        <div class="section-header">
+          <div class="eyebrow">07 · Double-Entry Explained</div>
+          <h2>The <span class="highlight">balance scale</span> that keeps books honest</h2>
+        </div>
+
+        <div class="double-entry-content">
+          <p class="de-intro">Every transaction has two sides. Debits must equal credits. When they don't balance, something's wrong.</p>
+          
+          <div class="balance-scale" id="balanceScale">
+            <div class="scale-arm">
+              <div class="scale-side debit-side">
+                <div class="side-label">Debits (left side)</div>
+                <div class="scale-entries">
+                  <div class="scale-entry">Prepaid Tour Costs: $3,451.50</div>
+                  <div class="scale-entry">Bank & FX Fees: $147.50</div>
+                  <div class="scale-entry">Software Subscriptions: $200.00</div>
+                  <div class="scale-entry">Employee Receivable: $113.44</div>
+                </div>
+                <div class="scale-total">$3,912.44</div>
+              </div>
+
+              <div class="scale-pivot">⚖</div>
+
+              <div class="scale-side credit-side">
+                <div class="side-label">Credits (right side)</div>
+                <div class="scale-entries">
+                  <div class="scale-entry">Cash — Chase Operating: $3,912.44</div>
+                </div>
+                <div class="scale-total">$3,912.44</div>
+              </div>
+            </div>
+            
+            <div class="balance-check" id="balanceCheck">
+              <div class="check-icon">✓</div>
+              <div class="check-text">Balanced: Debits = Credits</div>
+            </div>
+          </div>
+
+          <div class="de-explanation">
+            <h3>What's happening?</h3>
+            <p><strong>Cash goes down</strong> (credit) by $3,912.44. That must be offset by things going up (debits):</p>
+            <ul>
+              <li><strong>Prepaid costs</strong> (asset): we paid for a future show</li>
+              <li><strong>Expenses</strong> (decrease equity): fees and subscriptions consumed now</li>
+              <li><strong>Employee receivable</strong> (asset): employee owes us money back</li>
+            </ul>
+            <p class="de-note">The equation always holds: Assets = Liabilities + Equity. Every entry must balance.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 8: Trust & Limits -->
+    <section id="trust" class="section trust-section">
+      <div class="container">
+        <div class="section-header">
+          <div class="eyebrow">08 · Trust & Limits</div>
+          <h2>How we <span class="highlight">know it's safe</span></h2>
+        </div>
+
+        <div class="trust-content">
+          <div class="trust-grid">
+            <!-- Roles -->
+            <div class="trust-card">
+              <h3>Roles & Permissions</h3>
+              <div class="roles-list">
+                <div class="role-item">
+                  <div class="role-name">Sync Agent</div>
+                  <div class="role-perm">Can: Create work items</div>
+                </div>
+                <div class="role-item">
+                  <div class="role-name">AI Agent</div>
+                  <div class="role-perm">Can: Propose, Ask · Cannot: Approve, Post</div>
+                </div>
+                <div class="role-item">
+                  <div class="role-name">Controller</div>
+                  <div class="role-perm">Can: Approve, Reject, Answer</div>
+                </div>
+                <div class="role-item">
+                  <div class="role-name">Gateway</div>
+                  <div class="role-perm">Only role that can Post to ledger</div>
+                </div>
+              </div>
+              <div class="trust-rule">
+                <strong>Rule:</strong> Requester ≠ Approver. No self-approval, ever.
+              </div>
+            </div>
+
+            <!-- Audit Chain -->
+            <div class="trust-card audit-card">
+              <h3>Hash-Chained Audit Log</h3>
+              <div class="audit-chain-wrapper">
+                <div class="audit-chain" id="auditChain">
+                  <div class="audit-block" data-block="1">
+                    <div class="block-hash">0x7f3a...</div>
+                    <div class="block-content">Block 1: Sync bank line</div>
+                    <div class="block-prev">prev: null</div>
+                  </div>
+                  <div class="chain-link">→</div>
+                  <div class="audit-block" data-block="2">
+                    <div class="block-hash">0x9c21...</div>
+                    <div class="block-content">Block 2: Agent proposes</div>
+                    <div class="block-prev">prev: 0x7f3a...</div>
+                  </div>
+                  <div class="chain-link">→</div>
+                  <div class="audit-block" data-block="3">
+                    <div class="block-hash">0x4d88...</div>
+                    <div class="block-content">Block 3: Controller approves</div>
+                    <div class="block-prev">prev: 0x9c21...</div>
+                  </div>
+                  <div class="chain-link">→</div>
+                  <div class="audit-block" data-block="4">
+                    <div class="block-hash">0x1b5f...</div>
+                    <div class="block-content">Block 4: Gateway posts</div>
+                    <div class="block-prev">prev: 0x4d88...</div>
+                  </div>
+                </div>
+                <div class="tamper-message" id="tamperMessage" style="display:none;">
+                  <div class="tamper-icon">⚠</div>
+                  <div class="tamper-text">
+                    <strong>Tampering detected!</strong> Changing block 3 breaks the hash chain. All subsequent blocks are now invalid.
+                  </div>
+                </div>
+              </div>
+              <div class="trust-rule">
+                <strong>Tamper detection:</strong> Changing one block breaks the chain. Append-only, no updates.
+              </div>
+              <div class="audit-actions">
+                <button class="btn-ghost small" id="tamperTest">Simulate Tampering</button>
+                <button class="btn-ghost small" id="resetChain" style="display:none;">Reset Chain</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 9: Proof -->
+    <section id="proof" class="section proof-section">
+      <div class="container">
+        <div class="section-header">
+          <div class="eyebrow">09 · Proof It Works</div>
+          <h2>Verifiable facts, <span class="highlight">answer key</span>, live demo</h2>
+        </div>
+
+        <div class="proof-content">
+          <!-- Verifiable Facts -->
+          <div class="proof-facts">
+            <div class="fact-card">
+              <div class="fact-label">Balances to the cent</div>
+              <div class="fact-value">$3,912.44 = $3,912.44</div>
+              <div class="fact-detail">Every transaction, every time</div>
+            </div>
+            <div class="fact-card">
+              <div class="fact-label">Self-approval block</div>
+              <div class="fact-value">HTTP 403</div>
+              <div class="fact-detail">Jarvis cannot approve its own proposals</div>
+            </div>
+            <div class="fact-card">
+              <div class="fact-label">Hash-chained audit log</div>
+              <div class="fact-value">Append-only</div>
+              <div class="fact-detail">Tampering breaks the chain forward</div>
+            </div>
+            <div class="fact-card">
+              <div class="fact-label">Answer key on every tab</div>
+              <div class="fact-value">✓</div>
+              <div class="fact-detail">Score: measured live in the demo</div>
+            </div>
+          </div>
+
+          <!-- How It's Tested -->
+          <div class="real-vs-sim">
+            <h3>What's Real vs Simulated</h3>
+            <div class="rvs-grid">
+              <div class="rvs-col real-col">
+                <h4>Real</h4>
+                <ul>
+                  <li>Double-entry ledger (Beancount)</li>
+                  <li>Elastic hybrid search (BM25 + semantic)</li>
+                  <li>Claude agent with tools</li>
+                  <li>State machine, Gateway, audit log</li>
+                  <li>Hash-chain verification</li>
+                  <li>Subset-sum matching, FX math</li>
+                </ul>
+              </div>
+              <div class="rvs-col simulated-col">
+                <h4>Simulated</h4>
+                <ul>
+                  <li>Afterglow Labs (generated company)</li>
+                  <li>Bank/PayPal/Ramp data (real formats)</li>
+                  <li>Controller, vendors (LLM personas)</li>
+                  <li>Documents (invoices, SOWs, emails)</li>
+                  <li>~45 planted errors with answer key</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 10: Glossary -->
+    <section id="glossary" class="section glossary-section">
+      <div class="container">
+        <div class="section-header">
+          <div class="eyebrow">10 · Glossary</div>
+          <h2>Accounting terms, <span class="highlight">plain English</span></h2>
+        </div>
+
+        <div class="glossary-search">
+          <input type="text" id="glossarySearch" placeholder="Search terms..." class="search-input">
+        </div>
+
+        <div class="glossary-grid" id="glossaryGrid">
+          <!-- Terms will be generated via JS for flip animation -->
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Present Mode Overlay -->
+  <div id="presentMode" class="present-mode hidden">
+    <div class="present-slide-container">
+      <div class="present-slide"></div>
+    </div>
+    <div class="present-controls">
+      <div class="present-nav">
+        <button id="prevSlide" class="nav-btn">← Prev</button>
+        <span id="slideCounter" class="slide-counter">1 / 10</span>
+        <button id="nextSlide" class="nav-btn">Next →</button>
+      </div>
+      <button id="exitPresent" class="exit-btn">Exit Present Mode (ESC)</button>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

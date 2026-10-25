@@ -24,3 +24,12 @@ test:
 
 keys:             ## mint per-role Elastic API keys from the master key in .env
 	python -m jarvis.search.mint_keys
+
+site-dev:         ## run the explainer site in dev mode at http://localhost:3000
+	cd site && npm install && npm run dev
+
+site-build:       ## build the explainer site for production
+	cd site && npm install && npm run build
+
+site-serve:       ## serve the built explainer site
+	cd site && npm run serve
