@@ -7,12 +7,13 @@ import re
 import uuid
 
 from jarvis.agent import llm
+from jarvis.agent.context import JARVIS
 from jarvis.money import fmt, to_cents
 from jarvis.work import events
 from jarvis.work.db import J
 from jarvis.work.roles import actor
 from jarvis.work.sync import _upsert
-from jarvis.work.transition import append_audit, create_item, get_item, now
+from jarvis.work.transition import append_audit, create_item, get_item, now, transition
 from jarvis.world import bible, ids
 
 SYNC = actor("sync")
@@ -90,7 +91,15 @@ def parse(text: str) -> tuple[str, dict]:
     # Extract cardholder name (handle "Maya's card" or "cardholder: J. Ortiz")
     cardholder = re.search(r"([A-Z][a-z]+)'s card", text)
     if cardholder:
-        params["cardholder"] = cardholder.group(1)
+        # Map first names to full names from PEOPLE
+        first_name = cardholder.group(1).lower()
+        name_map = {
+            "maya": "Maya Chen",
+            "sam": "Sam Rivera", 
+            "lee": "Lee Okafor",
+            "dev": "Dev Patel"
+        }
+        params["cardholder"] = name_map.get(first_name, cardholder.group(1))
     else:
         cardholder = re.search(r'cardholder[:\s]+([A-Z]\.\s*[A-Z][a-z]+)', text)
         if cardholder:
@@ -103,11 +112,27 @@ def parse(text: str) -> tuple[str, dict]:
         k = "vendor_bank_change"
     elif "split" in t or ("under" in t and ("threshold" in t or "limit" in t)) or re.search(r'(three|multiple|several)\s+.*\$[\d,]+.*charges', t):
         k = "split_purchases"
-        # Extract number of charges and amount
-        num_match = re.search(r'(three|four|five|2|3|4|5)\s+', t)
+        # Extract number of charges and amounts
+        num_match = re.search(r'(three|four|five|six|2|3|4|5|6)\s+', t)
         if num_match:
-            num_map = {"three": 3, "four": 4, "five": 5, "2": 2, "3": 3, "4": 4, "5": 5}
+            num_map = {"three": 3, "four": 4, "five": 5, "six": 6, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6}
             params["count"] = num_map.get(num_match.group(1), 3)
+        # Extract multiple amounts if present (e.g., "$245, $235, $240")
+        amounts = re.findall(r'\$\s?([\d,]+(?:\.\d{1,2})?)', text)
+        if len(amounts) > 1:
+            params["amounts"] = [float(a.replace(",", "")) for a in amounts]
+            params["count"] = len(amounts)
+        # Extract approval limit if mentioned
+        limit_match = re.search(r'\$\s?([\d,]+(?:\.\d{1,2})?)\s+(?:approval\s+)?limit', t)
+        if limit_match:
+            params["approval_limit"] = float(limit_match.group(1).replace(",", ""))
+        # Extract source (Ramp/Chase/PayPal)
+        if "ramp" in t:
+            params["source"] = "Ramp"
+        elif "chase" in t:
+            params["source"] = "Chase"
+        elif "paypal" in t:
+            params["source"] = "PayPal"
     elif "ghost" in t or ("vendor" in t and ("fake" in t or "doesn't exist" in t or "no record" in t)):
         k = "ghost_vendor"
     elif "refund" in t and "revenue" in t:
@@ -224,60 +249,233 @@ def inject(session, text: str | None = None, template: str | None = None, params
         created = [get_item(db, r["item_id"]) for r in db.q("SELECT item_id FROM work_items") if r["item_id"] not in before]
     
     elif template == "vendor_bank_change":
-        # Freeze payment work item, mark NEEDS_INFO, request callback
+        # Create work item for vendor bank detail change - MUST verify via callback before payment
         v = next((x for x in bible.VENDORS if x["qbo_name"] == params["vendor"]), None)
+        if not v:
+            # Try to find vendor by partial name match
+            vendor_name = params.get("vendor", "")
+            for vendor in bible.VENDORS:
+                if vendor_name.lower() in vendor["qbo_name"].lower() or vendor["qbo_name"].lower() in vendor_name.lower():
+                    v = vendor
+                    break
+        
         if v:
+            cents = int(params["amount"] * 100)
+            d = params["date"]
             with db.tx():
-                anchor = f"inject:bank_change:{tag}"
-                it = create_item(db, SYNC, "bank_change", anchor, f"Vendor {params['vendor']} changed bank details before ${params['amount']/100:.2f} payment",
-                                "2026-09", [])
-                patch = {"alert": f"Vendor {params['vendor']} emailed new bank details before payment", "amount_cents": int(params['amount'] * 100),
-                         "requires": "callback_verification", "injected": text or template}
-                transition(db, it["item_id"], "needs_info", JARVIS, patch, reason="Bank detail change requires verification call")
+                anchor = f"inject:bank_change:{tag}:{v['id']}"
+                it = create_item(db, SYNC, "vendor_bank_change", anchor, 
+                                f"ALERT: {v['qbo_name']} bank details changed before ${params['amount']:.2f} payment",
+                                d[:7], [], 
+                                evidence=[{"type": "alert", "id": f"email-{tag}", "source": "email", 
+                                          "desc": f"Email from look-alike domain requesting bank change"}])
+                # Transition to NEEDS_INFO with evidence and requirement for callback
+                patch = {
+                    "alert": f"Vendor {v['qbo_name']} emailed new bank details before ${params['amount']:.2f} payment",
+                    "vendor_id": v["id"],
+                    "amount_cents": cents,
+                    "date": d,
+                    "requires": "callback_verification",
+                    "phone_on_file": "vendor master phone",
+                    "email_domain": v.get("domain", ""),
+                    "suspicious": True,
+                    "injected": text or template
+                }
+                it = transition(db, it["item_id"], "ask", JARVIS, patch, 
+                               reason=f"Bank detail change from look-alike domain before large payment - MUST verify via callback to {v['qbo_name']} phone on file before processing")
+                created.append(it)
+        else:
+            # Vendor not found, create generic alert
+            cents = int(params["amount"] * 100)
+            d = params.get("date", "2026-09-28")
+            with db.tx():
+                anchor = f"inject:bank_change:{tag}:unknown"
+                it = create_item(db, SYNC, "vendor_bank_change", anchor,
+                                f"ALERT: Unknown vendor bank change before ${params['amount']:.2f} payment",
+                                d[:7], [])
+                patch = {
+                    "alert": f"Bank detail change email for unknown vendor before ${params['amount']:.2f} payment",
+                    "amount_cents": cents,
+                    "date": d,
+                    "requires": "verification",
+                    "injected": text or template
+                }
+                it = transition(db, it["item_id"], "ask", JARVIS, patch,
+                               reason="Bank detail change for unknown vendor - must verify before any payment")
                 created.append(it)
     
     elif template == "split_purchases":
-        # Create N charges, flag threshold splitting
-        count = params.get("count", 3)
-        amt_each = params["amount"] / count
+        # Create N charges, then flag them as split to evade approval limits
+        amounts = params.get("amounts", [])
+        if not amounts:
+            count = params.get("count", 3)
+            total = params.get("amount", 750.0)
+            amt_each = total / count
+            amounts = [amt_each] * count
+        else:
+            count = len(amounts)
+        
+        merchant = params.get("merchant") or params.get("vendor", "Office Depot")
+        d = params.get("date", "2026-09-20")
+        source = params.get("source", "Ramp")
+        approval_limit = params.get("approval_limit", 2500.0)
+        
+        record_ids = []
         with db.tx():
-            for i in range(count):
-                rid = f"inj-split-{tag}-{i}"
-                _upsert(db, "ramp", rid, "card_txn", params["date"], int(amt_each * 100), "USD", params.get("vendor", "Office Depot"),
-                       f"Purchase {i+1}/{count}", {"ramp_id": rid, "settle": params["date"], "merchant": params.get("vendor", "Office Depot"),
-                                                   "descriptor": f"Purchase {i+1}/{count}", "cardholder": params.get("cardholder", "J. Ortiz"),
-                                                   "last4": "8812", "mcc": "5943", "department": "Live", "category": "Supplies",
-                                                   "memo": f"Split {i+1}/{count}", "receipt": "Yes", "threshold_split": True},
-                       {"injected": text or template, "threshold_split": True}, "injector", 0)
+            # Create ALL N charges first
+            for i, amt in enumerate(amounts):
+                cents = int(amt * 100)
+                if source == "Ramp":
+                    rid = f"inj-split-{tag}-{i}"
+                    _upsert(db, "ramp", rid, "card_txn", d, cents, "USD", merchant,
+                           f"{merchant} #{i+1}", 
+                           {"ramp_id": rid, "settle": d, "merchant": merchant,
+                            "descriptor": f"{merchant} #{i+1}", 
+                            "cardholder": params.get("cardholder", "J. Ortiz"),
+                            "last4": "8812", "mcc": "5943", "department": "Live", 
+                            "category": "Supplies", "memo": f"Split {i+1}/{count}", 
+                            "receipt": "Yes", "threshold_split": True},
+                           {"injected": text or template, "threshold_split": True}, "injector", 0)
+                    # Get the record_id
+                    rec = db.one("SELECT record_id FROM records WHERE src_id=?", (rid,))
+                    if rec:
+                        record_ids.append(rec["record_id"])
+                    
+                    # Create ledger entry for the charge
+                    eid = f"JE-SPLIT-{tag}-{i}"
+                    db.conn.execute("INSERT INTO ledger_entries VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                                   (eid, d, d[:7], f"{merchant} {i+1}/{count}", merchant,
+                                    "Expense", "", "ramp_sync", J({"ramp_id": rid}), None, "ramp_sync", now()))
+                    db.conn.execute("INSERT INTO ledger_lines VALUES(?,?,?,?,?,?)", (eid, 0, "6900", cents, "", None))
+                    db.conn.execute("INSERT INTO ledger_lines VALUES(?,?,?,?,?,?)", (eid, 1, "2050", -cents, "", None))
+            
+            # Now create the work item flagging this as threshold avoidance
             anchor = f"inject:split:{tag}"
-            it = create_item(db, SYNC, "threshold_split", anchor, f"{count} purchases of ~${amt_each:.2f} each to {params.get('vendor', 'vendor')} on {params['date']} (total ${params['amount']:.2f})",
-                            "2026-09", [])
-            patch = {"count": count, "amount_each": int(amt_each * 100), "total_cents": int(params['amount'] * 100),
-                     "vendor": params.get("vendor", "Office Depot"), "flagged_for_review": True, "injected": text or template}
-            transition(db, it["item_id"], "needs_info", JARVIS, patch, reason=f"Multiple charges under approval limit suggest threshold avoidance")
+            total_cents = sum(int(a * 100) for a in amounts)
+            it = create_item(db, SYNC, "threshold_split", anchor, 
+                            f"ESCALATE: {count} purchases to {merchant} on {d}, each under ${approval_limit:.2f} limit (total ${total_cents/100:.2f})",
+                            d[:7], record_ids)
+            
+            # Transition to NEEDS_INFO with evidence of threshold splitting
+            patch = {
+                "count": count,
+                "amounts": amounts,
+                "total_cents": total_cents,
+                "approval_limit_cents": int(approval_limit * 100),
+                "merchant": merchant,
+                "source": source,
+                "date": d,
+                "flagged_for_review": True,
+                "escalate_to": "Controller",
+                "rationale": f"All {count} charges are under the ${approval_limit:.2f} approval limit",
+                "injected": text or template
+            }
+            it = transition(db, it["item_id"], "ask", JARVIS, patch, 
+                           reason=f"{count} charges to same vendor on same day, each under ${approval_limit:.2f} approval threshold - likely split to avoid review. Escalating to Controller")
             created.append(it)
     
     elif template == "ghost_vendor":
-        # Payment to non-existent vendor
+        # Block payment to vendor with no W-9/SOW or whose details match employee
+        vendor_name = params.get("vendor", "Advanced Solutions Inc")
+        cents = int(params["amount"] * 100)
+        d = params.get("date", "2026-09-22")
+        
+        # Check if vendor is in vendor master
+        v = next((x for x in bible.VENDORS if x["qbo_name"] == vendor_name), None)
+        in_master = v is not None
+        
+        # Check for employee address/bank match (simulated red flags)
+        red_flags = []
+        if not in_master:
+            red_flags.append("Not in vendor master")
+        red_flags.append("No W-9 on file")
+        red_flags.append("No SOW or contract")
+        
+        # Check if name/address might match an employee (simple heuristic)
+        for person_id, person in bible.PEOPLE.items():
+            if person["name"].split()[-1] in vendor_name or vendor_name.split()[0] in person["name"]:
+                red_flags.append(f"Name similarity to employee {person['name']}")
+        
         with db.tx():
-            anchor = f"inject:ghost:{tag}"
-            it = create_item(db, SYNC, "ghost_vendor", anchor, f"Payment to '{params.get('vendor', 'Advanced Solutions Inc')}' for ${params['amount']:.2f} but vendor not in master",
-                            "2026-09", [])
-            patch = {"vendor_name": params.get("vendor", "Advanced Solutions Inc"), "amount_cents": int(params['amount'] * 100),
-                     "date": params["date"], "no_w9": True, "no_contract": True, "requires": "vendor_verification", "injected": text or template}
-            transition(db, it["item_id"], "needs_info", JARVIS, patch, reason="Payment to vendor not in master; no W-9 or contract on file")
+            anchor = f"inject:ghost:{tag}:{vendor_name.replace(' ', '_')}"
+            it = create_item(db, SYNC, "ghost_vendor", anchor, 
+                            f"BLOCK: Payment to '{vendor_name}' ${params['amount']:.2f} - vendor verification required",
+                            d[:7], [],
+                            evidence=[{"type": "alert", "id": f"ghost-{tag}", "source": "vendor_check",
+                                      "desc": "; ".join(red_flags)}])
+            
+            # Transition to NEEDS_INFO - payment is BLOCKED
+            patch = {
+                "vendor_name": vendor_name,
+                "amount_cents": cents,
+                "date": d,
+                "in_master": in_master,
+                "no_w9": True,
+                "no_sow": True,
+                "red_flags": red_flags,
+                "requires": "vendor_verification",
+                "status": "BLOCKED",
+                "escalate_to": "Controller",
+                "injected": text or template
+            }
+            it = transition(db, it["item_id"], "ask", JARVIS, patch,
+                           reason=f"BLOCKING ${params['amount']:.2f} payment to '{vendor_name}': " + "; ".join(red_flags) + ". Escalating to Controller for vendor verification")
             created.append(it)
     
     elif template == "refund_as_revenue":
-        # Refund booked as revenue instead of contra-expense
-        cents = int(params['amount'] * 100)
+        # Customer refund incorrectly booked as revenue - propose reclass
+        merchant = params.get("merchant", "Bay Rig Rentals")
+        cents = int(params["amount"] * 100)
+        d = params.get("date", "2026-09-25")
+        
+        # Create the incorrect revenue entry first (simulating the misclassification)
         with db.tx():
-            anchor = f"inject:refund:{tag}"
-            it = create_item(db, SYNC, "refund_misclass", anchor, f"+${params['amount']:.2f} from {params.get('merchant', 'Stripe')} is a refund, not revenue",
-                            "2026-09", [])
-            patch = {"merchant": params.get("merchant", "Stripe"), "amount_cents": cents, "date": params["date"],
-                     "booked_to": "4950", "should_be": "contra_expense", "injected": text or template}
-            transition(db, it["item_id"], "needs_info", JARVIS, patch, reason="Credit classified as revenue; should be contra-expense/refund")
+            # Wrong entry: booked to revenue
+            wrong_eid = f"JE-WRONGREV-{tag}"
+            db.conn.execute("INSERT INTO ledger_entries VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                           (wrong_eid, d, d[:7], f"Refund from {merchant} (MISCLASSIFIED)", merchant,
+                            "Revenue", "", "stripe_sync", J({"refund": True}), None, "stripe_sync", now()))
+            db.conn.execute("INSERT INTO ledger_lines VALUES(?,?,?,?,?,?)", (wrong_eid, 0, "1010", cents, "", None))
+            db.conn.execute("INSERT INTO ledger_lines VALUES(?,?,?,?,?,?)", (wrong_eid, 1, "4950", -cents, "", None))
+            
+            # Create work item to reclass it
+            anchor = f"inject:refund:{tag}:{merchant.replace(' ', '_')}"
+            it = create_item(db, SYNC, "refund_reclass", anchor,
+                            f"Reclass needed: +${params['amount']:.2f} from {merchant} is refund, not revenue",
+                            d[:7], [],
+                            evidence=[{"type": "ledger", "id": wrong_eid, "source": "ledger_entry",
+                                      "desc": f"Incorrectly booked to 4950 Other Income"}])
+            
+            # Propose the reclassification entry
+            # Debit 4950 (reverse the revenue), Credit proper account (contra-expense or AR)
+            # Find the original expense account for this vendor
+            original_acct = "5020"  # Bay Rig Rentals is gear rental
+            v = next((x for x in bible.VENDORS if merchant in x["qbo_name"] or x["qbo_name"] in merchant), None)
+            if v:
+                original_acct = v.get("default_acct", "5020")
+            
+            patch = {
+                "merchant": merchant,
+                "amount_cents": cents,
+                "date": d,
+                "wrong_entry": wrong_eid,
+                "booked_to": "4950",
+                "should_be_contra": original_acct,
+                "proposal": {
+                    "date": d,
+                    "memo": f"Reclass {merchant} refund from revenue to contra-expense",
+                    "lines": [
+                        {"acct": "4950", "cents": cents, "memo": "Reverse incorrect revenue"},
+                        {"acct": original_acct, "cents": -cents, "memo": f"Contra-expense: {merchant} refund"}
+                    ],
+                    "txn_type": "Journal Entry",
+                    "match_entries": [wrong_eid]
+                },
+                "rationale": f"${params['amount']:.2f} credit from {merchant} was booked to 4950 Other Income, but this is a customer refund for services/rentals and should be recorded as a contra-expense in {original_acct} {bible.acct_name(original_acct)}",
+                "injected": text or template
+            }
+            it = transition(db, it["item_id"], "propose", JARVIS, patch,
+                           reason=f"Refund from {merchant} misclassified as revenue (4950); proposing reclass to contra-expense ({original_acct})")
             created.append(it)
     
     elif template == "paypal_bundle":
