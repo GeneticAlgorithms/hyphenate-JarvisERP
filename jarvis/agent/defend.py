@@ -30,9 +30,16 @@ def _dossier(item: dict) -> str:
                       for l in item["proposal"].get("lines", []))
     evid = "\n".join(f"  [{e['relation']}] {e['type']} {e['id']}: {e['label']} {e.get('detail', '')}"
                      for e in item.get("evidence", []))
+    
+    # Include materiality threshold and P-0317 context
+    materiality = fmt(bible.APPROVAL_MATRIX.get("materiality_cents", 50000))
+    p0317_note = ("\nRuling P-0317 (March 2026): Personal purchases on company cards/PayPal go to 1250 Employee Receivable "
+                  "regardless of amount. Materiality ($500) applies to judgment calls, not control issues like personal purchases.")
+    
     return (f"Item {item['item_id']} ({item['kind']}, state {item['state']}): {item['title']}\nProposed lines:\n{lines}\n"
             f"Rationale: {item['rationale']}\nEvidence:\n{evid}\nPolicies: {item.get('policy_id')}\n"
-            f"Precedents: {item.get('precedent_ids')}\nTrust ranking: {TRUST.get(item['kind'], 'n/a')}")
+            f"Precedents: {item.get('precedent_ids')}\nTrust ranking: {TRUST.get(item['kind'], 'n/a')}\n"
+            f"Materiality threshold: {materiality}{p0317_note}")
 
 
 def _template(item: dict, question: str) -> str:

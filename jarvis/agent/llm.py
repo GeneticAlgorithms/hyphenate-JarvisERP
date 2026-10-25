@@ -38,22 +38,34 @@ def _select_models() -> dict[str, str]:
         # Extract model IDs
         available_models = [m.id for m in models_response.data if hasattr(m, 'id')]
         
-        # Find newest sonnet (reasoning) and haiku (fast)
-        # Model naming: claude-3-5-sonnet-YYYYMMDD or claude-3-5-haiku-YYYYMMDD
-        sonnet_pattern = re.compile(r'claude-\d+-\d+-sonnet-(\d{8})')
-        haiku_pattern = re.compile(r'claude-\d+-\d+-haiku-(\d{8})')
+        # Find best sonnet (reasoning) and haiku (fast) by family name
+        # Handle both old (claude-3-5-sonnet-YYYYMMDD) and new (claude-sonnet-5-5) naming schemes
+        sonnet_pattern = re.compile(r'claude.*sonnet', re.IGNORECASE)
+        haiku_pattern = re.compile(r'claude.*haiku', re.IGNORECASE)
         
-        sonnets = [(m, sonnet_pattern.search(m)) for m in available_models]
-        sonnets = [(m, match.group(1)) for m, match in sonnets if match]
-        sonnets.sort(key=lambda x: x[1], reverse=True)  # Newest first
+        # Filter by family
+        sonnets = [m for m in available_models if sonnet_pattern.search(m)]
+        haikus = [m for m in available_models if haiku_pattern.search(m)]
         
-        haikus = [(m, haiku_pattern.search(m)) for m in available_models]
-        haikus = [(m, match.group(1)) for m, match in haikus if match]
-        haikus.sort(key=lambda x: x[1], reverse=True)
+        # Sort: prefer higher version numbers (5-5 > 4-5 > 3-5), then dates if present
+        def model_sort_key(model_id: str) -> tuple:
+            # Extract version numbers like 5-5 or 3-5
+            version_match = re.search(r'(\d+)[-.] (\d+)', model_id)
+            if version_match:
+                major, minor = int(version_match.group(1)), int(version_match.group(2))
+            else:
+                major, minor = 0, 0
+            # Extract date if present
+            date_match = re.search(r'(\d{8})$', model_id)
+            date = int(date_match.group(1)) if date_match else 0
+            return (major, minor, date)
+        
+        sonnets.sort(key=model_sort_key, reverse=True)
+        haikus.sort(key=model_sort_key, reverse=True)
         
         _selected_models = {
-            "reasoning": sonnets[0][0] if sonnets else fallback["reasoning"],
-            "fast": haikus[0][0] if haikus else fallback["fast"]
+            "reasoning": sonnets[0] if sonnets else fallback["reasoning"],
+            "fast": haikus[0] if haikus else fallback["fast"]
         }
         
     except Exception as e:
@@ -71,7 +83,7 @@ def client():
     return _client
 
 
-def complete(system: str, user: str, fast: bool = False, max_tokens: int = 700) -> str | None:
+def complete(system: str, user: str, fast: bool = False, max_tokens: int = 2000) -> str | None:
     if not available():
         return None
     try:

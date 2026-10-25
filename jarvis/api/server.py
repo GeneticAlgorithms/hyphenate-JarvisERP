@@ -116,9 +116,13 @@ def state():
     for p in pols:
         p["evidence"] = L(p["evidence"], [])
         p["matcher"] = L(p["matcher"], {})
+    # Test LLM live, not just if key is configured
+    llm_test = llm.test_live()
+    llm_live = llm_test.get("status") == "live"
+    
     return {"seed": s.seed, "company": "Afterglow Labs, Inc.", "period": config.CLOSE_PERIOD, "bootstrapped": boot,
             "phase": db.kv_get("phase"), "world_date": db.kv_get("world_date"), "busy": STATE["busy"],
-            "auto_controller": STATE["auto_controller"], "llm": llm.available(), "search": s.ctx.search.status(),
+            "auto_controller": STATE["auto_controller"], "llm": llm_live, "search": s.ctx.search.status(),
             "paypal_fault": sync.PayPalAPI.fault, "status": st, "policies": pols,
             "counts": {"records": db.one("SELECT COUNT(*) n FROM records")["n"],
                        "docs": db.one("SELECT COUNT(*) n FROM docs")["n"],
