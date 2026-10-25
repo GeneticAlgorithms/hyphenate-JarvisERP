@@ -69,6 +69,11 @@ def index():
     return FileResponse(config.UI_DIR / "workbench.html")
 
 
+@app.get("/landing", response_class=HTMLResponse)
+def landing():
+    return FileResponse(config.UI_DIR / "landing.html")
+
+
 @app.get("/synapse", response_class=HTMLResponse)
 def synapse():
     return FileResponse(config.UI_DIR / "synapse.html")
