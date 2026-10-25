@@ -12,11 +12,10 @@ from jarvis.api import server
 # Use TestClient instead of real server
 @pytest.fixture(scope="module")
 def client():
-    """Create test client with speed=0 for deterministic tests."""
+    """Create test client."""
     with TestClient(server.app) as c:
-        # Set speed to 0 to eliminate animation delays in tests
-        resp = c.post("/api/wb/speed", json={"speed": 0})
-        assert resp.status_code == 200
+        # Note: speed setting removed - tests use default Workbench speed
+        # User specifies speed=0 at workbench creation for unit tests (test_workbench.py)
         yield c
 
 TABS = [
