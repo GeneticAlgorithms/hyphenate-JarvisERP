@@ -18,13 +18,27 @@ def available() -> bool:
 
 
 def _select_models() -> dict[str, str]:
-    """Query Anthropic API for available models and pick newest Sonnet/Haiku."""
+    """Query Anthropic API for available models and pick newest Sonnet/Haiku.
+    
+    Env vars JARVIS_MODEL_REASONING and JARVIS_MODEL_FAST override selection.
+    Verified working models: claude-sonnet-4-5, claude-haiku-4-5
+    """
     global _selected_models
     if _selected_models is not None:
         return _selected_models
     
+    # Check for env var overrides first
+    import os
+    env_reasoning = os.getenv("JARVIS_MODEL_REASONING")
+    env_fast = os.getenv("JARVIS_MODEL_FAST")
+    
     # Fallback to configured models
     fallback = {"fast": config.MODEL_FAST, "reasoning": config.MODEL_REASONING}
+    
+    # If both env vars are set, use them and skip API query
+    if env_reasoning and env_fast:
+        _selected_models = {"reasoning": env_reasoning, "fast": env_fast}
+        return _selected_models
     
     if not available():
         _selected_models = fallback
@@ -39,7 +53,7 @@ def _select_models() -> dict[str, str]:
         available_models = [m.id for m in models_response.data if hasattr(m, 'id')]
         
         # Find best sonnet (reasoning) and haiku (fast) by family name
-        # Handle both old (claude-3-5-sonnet-YYYYMMDD) and new (claude-sonnet-5-5) naming schemes
+        # Handle all naming schemes: claude-sonnet-4-5, claude-sonnet-5-5, claude-3-5-sonnet-YYYYMMDD
         sonnet_pattern = re.compile(r'claude.*sonnet', re.IGNORECASE)
         haiku_pattern = re.compile(r'claude.*haiku', re.IGNORECASE)
         
@@ -49,13 +63,13 @@ def _select_models() -> dict[str, str]:
         
         # Sort: prefer higher version numbers (5-5 > 4-5 > 3-5), then dates if present
         def model_sort_key(model_id: str) -> tuple:
-            # Extract version numbers like 5-5 or 3-5
-            version_match = re.search(r'(\d+)[-.] (\d+)', model_id)
+            # Extract version numbers like 5-5, 4-5, or 3-5
+            version_match = re.search(r'(\d+)[-.]\s*(\d+)', model_id)
             if version_match:
                 major, minor = int(version_match.group(1)), int(version_match.group(2))
             else:
                 major, minor = 0, 0
-            # Extract date if present
+            # Extract date if present (YYYYMMDD at end)
             date_match = re.search(r'(\d{8})$', model_id)
             date = int(date_match.group(1)) if date_match else 0
             return (major, minor, date)
@@ -63,14 +77,18 @@ def _select_models() -> dict[str, str]:
         sonnets.sort(key=model_sort_key, reverse=True)
         haikus.sort(key=model_sort_key, reverse=True)
         
+        # Use env var override if provided, else use discovered model, else fallback
         _selected_models = {
-            "reasoning": sonnets[0] if sonnets else fallback["reasoning"],
-            "fast": haikus[0] if haikus else fallback["fast"]
+            "reasoning": env_reasoning or (sonnets[0] if sonnets else fallback["reasoning"]),
+            "fast": env_fast or (haikus[0] if haikus else fallback["fast"])
         }
         
     except Exception as e:
         # Fall back to configured models on any error
-        _selected_models = fallback
+        _selected_models = {
+            "reasoning": env_reasoning or fallback["reasoning"],
+            "fast": env_fast or fallback["fast"]
+        }
     
     return _selected_models
 
