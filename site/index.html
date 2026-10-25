@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="./src/style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
   <!-- Navigation -->
@@ -82,48 +82,46 @@
             </div>
           </div>
 
-          <!-- Split entries -->
-          <div class="split-container" id="splitContainer">
-            <div class="split-header">
-              <span class="mono-label">JARVIS SPLITS IT</span>
-              <span class="confidence">Confidence: 99%</span>
-            </div>
-            
-            <div class="split-entries">
-              <div class="entry-card" id="entry1">
-                <div class="entry-amount">$3,451.50</div>
-                <div class="entry-desc">Prepaid Tour Costs</div>
-                <div class="entry-detail">Kraftwerk Rigging · Berlin Nov 14 show · €2,950 @ ECB 1.1700</div>
-                <div class="entry-tag">Cut-off: future period</div>
-              </div>
+          <!-- Isometric split stack -->
+          <div class="split-visual">
+            <div class="split-arrow">↓</div>
+            <p class="split-label">Jarvis decomposes the line:</p>
+          </div>
 
-              <div class="entry-card" id="entry2">
-                <div class="entry-amount">$147.50</div>
-                <div class="entry-desc">Bank & FX Fees</div>
-                <div class="entry-detail">PayPal spread · actual 1.2200 vs market 1.1700</div>
-                <div class="entry-tag">FX fee</div>
-              </div>
-
-              <div class="entry-card" id="entry3">
-                <div class="entry-amount">$200.00</div>
-                <div class="entry-desc">Software Subscriptions</div>
-                <div class="entry-detail">Vendor: Anthropic (linked alias "Claude")</div>
-                <div class="entry-tag">Vendor deduplication</div>
-              </div>
-
-              <div class="entry-card" id="entry4">
-                <div class="entry-amount">$113.44</div>
-                <div class="entry-desc">Employee Receivable</div>
-                <div class="entry-detail">J. Ortiz · Steam purchase · Policy P-0317</div>
-                <div class="entry-tag">Personal purchase</div>
-              </div>
+          <div class="card-stack" id="momentStack">
+            <div class="stacked-card" id="momentCard1" style="--fan-offset: 0;">
+              <div class="entry-amount">$3,451.50</div>
+              <div class="entry-desc">Prepaid Tour Costs</div>
+              <div class="entry-detail">Kraftwerk Rigging · Berlin Nov 14 show · €2,950 @ ECB 1.1700</div>
+              <div class="entry-tag">Cut-off: future period</div>
             </div>
 
-            <div class="total-line">
-              <span>Total:</span>
-              <span class="amount">$3,912.44</span>
-              <span class="check">✓ Balanced to the cent</span>
+            <div class="stacked-card" id="momentCard2" style="--fan-offset: 1;">
+              <div class="entry-amount">$147.50</div>
+              <div class="entry-desc">Bank & FX Fees</div>
+              <div class="entry-detail">PayPal spread · actual 1.2200 vs market 1.1700</div>
+              <div class="entry-tag">FX fee</div>
             </div>
+
+            <div class="stacked-card" id="momentCard3" style="--fan-offset: 2;">
+              <div class="entry-amount">$200.00</div>
+              <div class="entry-desc">Software Subscriptions</div>
+              <div class="entry-detail">Vendor: Anthropic (linked alias "Claude")</div>
+              <div class="entry-tag">Vendor deduplication</div>
+            </div>
+
+            <div class="stacked-card" id="momentCard4" style="--fan-offset: 3;">
+              <div class="entry-amount">$113.44</div>
+              <div class="entry-desc">Employee Receivable</div>
+              <div class="entry-detail">J. Ortiz · Steam purchase · Policy P-0317</div>
+              <div class="entry-tag">Personal purchase</div>
+            </div>
+          </div>
+
+          <div class="total-line">
+            <span>Total:</span>
+            <span class="amount">$3,912.44</span>
+            <span class="check">✓ Balanced to the cent</span>
           </div>
 
           <!-- Challenge & Defense -->
@@ -466,88 +464,79 @@
       </div>
     </section>
 
-    <!-- Section 6: Architecture -->
+    <!-- Section 6: Architecture - SIGNATURE ISOMETRIC STACK -->
     <section id="architecture" class="section architecture-section">
       <div class="container">
         <div class="section-header">
           <div class="eyebrow">06 · System Architecture</div>
           <h2>Where everything lives and <span class="highlight">how data flows</span></h2>
+          <p class="section-intro">An isometric view of the entire system stack</p>
         </div>
 
-        <div class="arch-diagram" id="archDiagram">
-          <!-- Will be animated with layered reveals -->
-          <div class="arch-row">
-            <div class="arch-layer" data-layer="sources">
-              <div class="layer-title">Source Systems</div>
-              <div class="arch-boxes">
-                <div class="arch-box">Chase Bank</div>
-                <div class="arch-box">PayPal</div>
-                <div class="arch-box">Ramp</div>
-                <div class="arch-box">Email/Drive</div>
-              </div>
-            </div>
-
-            <div class="arch-arrow-down">↓</div>
-
-            <div class="arch-layer" data-layer="erp">
-              <div class="layer-title">ERP / QuickBooks</div>
-              <div class="arch-boxes">
-                <div class="arch-box">Bank Feed</div>
-                <div class="arch-box">General Ledger</div>
-                <div class="arch-box">Chart of Accounts</div>
-                <div class="arch-box">AP/AR Subledgers</div>
-                <div class="arch-box">Vendor Master</div>
-              </div>
+        <div class="iso-stack" id="isoStack">
+          <!-- Layer 1: Source Systems -->
+          <div class="iso-layer" data-layer="1">
+            <div class="iso-layer-title">Source Systems</div>
+            <div class="iso-layer-content">
+              <div class="iso-item">Chase Bank</div>
+              <div class="iso-item">PayPal</div>
+              <div class="iso-item">Ramp</div>
+              <div class="iso-item">Gusto</div>
+              <div class="iso-item">Email/Drive</div>
             </div>
           </div>
 
-          <div class="arch-row">
-            <div class="arch-layer" data-layer="jarvis">
-              <div class="layer-title">Jarvis System of Work</div>
-              <div class="arch-boxes">
-                <div class="arch-box highlight">Work Items (state machine)</div>
-                <div class="arch-box highlight">Evidence Store & Search</div>
-                <div class="arch-box highlight">Learned Policies</div>
-                <div class="arch-box highlight">Single Gateway (only writer)</div>
-                <div class="arch-box highlight">Hash-Chained Audit Log</div>
-              </div>
+          <!-- Layer 2: ERP/QuickBooks -->
+          <div class="iso-layer" data-layer="2">
+            <div class="iso-layer-title">ERP / QuickBooks</div>
+            <div class="iso-layer-content">
+              <div class="iso-item">Bank Feed</div>
+              <div class="iso-item">General Ledger</div>
+              <div class="iso-item">Chart of Accounts</div>
+              <div class="iso-item">AP/AR Subledgers</div>
+              <div class="iso-item">Vendor Master</div>
             </div>
           </div>
 
-          <div class="arch-row">
-            <div class="arch-arrow-down">↓</div>
-
-            <div class="arch-layer" data-layer="people">
-              <div class="layer-title">People</div>
-              <div class="arch-boxes">
-                <div class="arch-box">Controller (approves/rejects)</div>
-                <div class="arch-box">Dev (hands off)</div>
-                <div class="arch-box">Auditor (asks why)</div>
-              </div>
-            </div>
-
-            <div class="arch-arrow-down">↓</div>
-
-            <div class="arch-layer" data-layer="outputs">
-              <div class="layer-title">Outputs</div>
-              <div class="arch-boxes">
-                <div class="arch-box">Drive Evidence Folder</div>
-                <div class="arch-box">Financial Package</div>
-                <div class="arch-box">Journal Entries</div>
-              </div>
+          <!-- Layer 3: Jarvis System of Work -->
+          <div class="iso-layer" data-layer="3">
+            <div class="iso-layer-title">Jarvis System of Work</div>
+            <div class="iso-layer-content">
+              <div class="iso-item">Work Items</div>
+              <div class="iso-item">Evidence Store</div>
+              <div class="iso-item">Learned Policies</div>
             </div>
           </div>
 
-          <!-- Animated packet -->
-          <div class="data-packet" id="dataPacket"></div>
+          <!-- Layer 4: Controls -->
+          <div class="iso-layer" data-layer="4">
+            <div class="iso-layer-title">Controls & Gateway</div>
+            <div class="iso-layer-content">
+              <div class="iso-item">Single Gateway</div>
+              <div class="iso-item">Roles & Permissions</div>
+              <div class="iso-item">Audit Chain</div>
+            </div>
+            <div class="denial-flash" id="denialFlash">⛔ Self-approval denied</div>
+          </div>
 
-          <!-- Rejection flash -->
-          <div class="rejection-flash" id="rejectionFlash">
-            <div class="rejection-content">
-              <div class="rejection-icon">⛔</div>
-              <div class="rejection-text">Self-approval denied</div>
+          <!-- Layer 5: People & Outputs -->
+          <div class="iso-layer" data-layer="5">
+            <div class="iso-layer-title">People & Outputs</div>
+            <div class="iso-layer-content">
+              <div class="iso-item">Controller</div>
+              <div class="iso-item">Auditor</div>
+              <div class="iso-item">Drive Evidence</div>
+              <div class="iso-item">Financial Package</div>
             </div>
           </div>
+
+          <!-- Animated transaction packets -->
+          <div class="tx-packet" id="txPacket1"></div>
+          <div class="tx-packet" id="txPacket2"></div>
+        </div>
+
+        <div class="arch-caption">
+          <p>Transaction packets flow upward through each layer. The Gateway (Controls layer) validates every write. Denied self-approvals flash red.</p>
         </div>
       </div>
     </section>

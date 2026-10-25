@@ -216,28 +216,65 @@ function initScrollAnimations() {
     }
   });
 
-  // Split container reveal
-  gsap.to('#splitContainer', {
+  // Split visual arrow
+  gsap.to('.split-visual', {
     opacity: 1,
-    y: 0,
-    duration: 0.8,
+    duration: 0.6,
     scrollTrigger: {
-      trigger: '#splitContainer',
+      trigger: '.split-visual',
       start: 'top 75%',
     }
   });
 
-  // Individual entry cards with stagger
-  gsap.to('.entry-card', {
-    opacity: 1,
-    x: 0,
-    duration: 0.6,
-    stagger: 0.15,
-    scrollTrigger: {
-      trigger: '#splitContainer',
-      start: 'top 70%',
+  // Moment stack - Reveal and fan out stacked cards
+  const momentCards = ['#momentCard1', '#momentCard2', '#momentCard3', '#momentCard4'];
+  momentCards.forEach((cardId, index) => {
+    const card = document.querySelector(cardId);
+    if (card) {
+      // Initial reveal
+      gsap.to(card, {
+        opacity: 1,
+        duration: 0.6,
+        delay: index * 0.15,
+        scrollTrigger: {
+          trigger: '#momentStack',
+          start: 'top 70%',
+        },
+        onComplete: () => {
+          // Add fanned class after reveal
+          setTimeout(() => {
+            card.classList.add('fanned');
+          }, 500);
+        }
+      });
     }
   });
+
+  // Legacy split container support (for challenge/defense cards)
+  const splitContainer = document.querySelector('#splitContainer');
+  if (splitContainer) {
+    gsap.to(splitContainer, {
+      opacity: 1,
+      y: 0,
+      duration: 0.8,
+      scrollTrigger: {
+        trigger: splitContainer,
+        start: 'top 75%',
+      }
+    });
+
+    // Individual entry cards with stagger
+    gsap.to('.entry-card', {
+      opacity: 1,
+      x: 0,
+      duration: 0.6,
+      stagger: 0.15,
+      scrollTrigger: {
+        trigger: splitContainer,
+        start: 'top 70%',
+      }
+    });
+  }
 
   // Section 3: Systems - Mismatched shapes
   gsap.to('.system-shape', {
@@ -326,22 +363,90 @@ function initScrollAnimations() {
     });
   });
 
-  // Section 6: Architecture - Layered diagram
-  const archLayers = gsap.utils.toArray('.arch-layer');
-  archLayers.forEach((layer, index) => {
+  // Section 6: Architecture - Isometric Stack
+  const isoLayers = document.querySelectorAll('.iso-layer');
+  isoLayers.forEach((layer, index) => {
     gsap.to(layer, {
       opacity: 1,
-      y: 0,
       duration: 0.8,
-      delay: index * 0.3,
+      delay: index * 0.2,
       scrollTrigger: {
-        trigger: '#archDiagram',
+        trigger: '#isoStack',
         start: 'top 70%',
+      },
+      onComplete: () => {
+        layer.classList.add('active');
       }
     });
   });
 
-  // Animate data packet through architecture
+  // Animate transaction packets through the stack
+  const txPacket1 = document.getElementById('txPacket1');
+  const txPacket2 = document.getElementById('txPacket2');
+  
+  if (txPacket1) {
+    gsap.to(txPacket1, {
+      scrollTrigger: {
+        trigger: '#isoStack',
+        start: 'top 50%',
+        onEnter: () => {
+          txPacket1.classList.add('animating');
+        }
+      }
+    });
+  }
+
+  if (txPacket2) {
+    gsap.to(txPacket2, {
+      scrollTrigger: {
+        trigger: '#isoStack',
+        start: 'top 45%',
+        onEnter: () => {
+          setTimeout(() => {
+            txPacket2.classList.add('animating');
+          }, 1500);
+        }
+      }
+    });
+  }
+
+  // Denial flash on controls layer
+  const denialFlash = document.getElementById('denialFlash');
+  if (denialFlash) {
+    gsap.to(denialFlash, {
+      scrollTrigger: {
+        trigger: '#isoStack',
+        start: 'top 40%',
+        onEnter: () => {
+          setTimeout(() => {
+            denialFlash.classList.add('active');
+            setTimeout(() => {
+              denialFlash.classList.remove('active');
+            }, 2000);
+          }, 2500);
+        }
+      }
+    });
+  }
+
+  // Legacy architecture support (in case old elements exist)
+  const archLayers = gsap.utils.toArray('.arch-layer');
+  if (archLayers.length > 0) {
+    archLayers.forEach((layer, index) => {
+      gsap.to(layer, {
+        opacity: 1,
+        y: 0,
+        duration: 0.8,
+        delay: index * 0.3,
+        scrollTrigger: {
+          trigger: '#archDiagram',
+          start: 'top 70%',
+        }
+      });
+    });
+  }
+
+  // Legacy packet animation
   const packet = document.getElementById('dataPacket');
   if (packet) {
     gsap.to(packet, {
@@ -357,7 +462,6 @@ function initScrollAnimations() {
         start: 'top 50%',
       },
       onComplete: () => {
-        // Show rejection flash
         const rejection = document.getElementById('rejectionFlash');
         if (rejection) {
           gsap.to(rejection, {
