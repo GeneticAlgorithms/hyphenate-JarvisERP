@@ -198,6 +198,11 @@ class Engine:
         ctx = self.ctx
         events.publish("phase", name="close", text=f"Closing {period}")
         t0 = time.time()
+        
+        # Auto-onboard policies if any are pending (fixes order dependence bug I)
+        from jarvis.agent import personas
+        personas.auto_controller(self, max_rounds=1)
+        
         # 1) every unreconciled bank line is work
         for it in self.discover(period):
             self.process_item(it, "bank_line")
