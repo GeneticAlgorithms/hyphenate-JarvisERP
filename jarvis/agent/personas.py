@@ -53,7 +53,7 @@ def controller_answer(item: dict) -> str:
             return ans
     if llm.available():
         out = llm.complete("You are Maya Chen, Controller. Answer the accountant's question in one or two sentences. "
-                           "If you genuinely don't know, say so and say what to do.", item.get("question", ""), fast=True)
+                           "If you genuinely don't know, say so and say what to do.", item.get("question", ""), fast=True, db=eng.db, actor_name="human_controller")
         if out:
             return out
     if item["kind"] == "aging":
