@@ -6,7 +6,7 @@ import pytest
 import requests
 import time
 
-BASE_URL = "http://localhost:8001"
+BASE_URL = "http://localhost:8002"
 
 TABS = [
     "p1_timing",
