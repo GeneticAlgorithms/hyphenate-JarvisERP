@@ -6,6 +6,66 @@
 
 ---
 
+## System architecture
+
+```mermaid
+flowchart TD
+  subgraph SRC["1 · Systems of record (simulated, seed 2026)"]
+    CH[Chase bank feed]
+    PP[PayPal activity]
+    RA[Ramp card charges]
+    GU[Gusto payroll]
+    DOC[Email and Drive docs<br/>receipts, invoices, W-9s]
+  end
+  subgraph ERP["2 · QBO-style ERP / General Ledger"]
+    BF[Bank feed + QBO suggestions]
+    GL[(General Ledger<br/>chart of accounts)]
+    SUB[AP / AR subledgers<br/>vendor master]
+    RPT[GL detail, BS / IS / CF]
+  end
+  subgraph JAR["3 · JarvisERP: the system of work"]
+    INJ[Scenario injector<br/>judge prompts]
+    AG[Close agents<br/>p1 timing · p2 roll-forward<br/>p3 bank · p4 evidence · p5 vendors]
+    EV[Evidence search<br/>looks up the source record]
+    POL[Policies + precedents<br/>bible: approval matrix, materiality]
+    WI[Work items<br/>new → proposed → needs info<br/>→ approved → posted]
+    DEF[Challenge / defend / concede]
+  end
+  subgraph CTRL["4 · Controls, enforced in code"]
+    RO{Roles check<br/>no self-approval}
+    GW[Ledger gateway<br/>only path that writes]
+    AU[(Hash-chained<br/>append-only audit log)]
+  end
+  subgraph PPL["5 · People and outputs"]
+    CO[Controller<br/>approves or says no]
+    AUD[Auditor<br/>replays the audit log]
+    OUT[Drive evidence folder<br/>September financial package]
+  end
+  CH & PP & RA & GU --> BF
+  DOC --> EV
+  BF --> AG
+  INJ --> AG
+  GL & SUB --> AG
+  AG --> EV --> WI
+  POL --> AG
+  WI -->|unclear: asks| CO
+  CO -->|challenge| DEF
+  DEF -->|holds with evidence<br/>or concedes + re-proposes| WI
+  DEF -->|correction becomes precedent| POL
+  WI -->|approve request| RO
+  CO -->|approves| RO
+  RO -->|agent approving itself: 403 denied| AU
+  RO -->|allowed| GW
+  GW --> GL
+  GW --> AU
+  GL --> RPT --> OUT
+  AU --> AUD
+```
+
+**Example flow: the $3,912.44 PayPal line.** Chase shows `PAYPAL *INST XFER` −$3,912.44 and QBO suggests software; the p3 bank agent looks up the PayPal record and splits it into $3,451.50 (1310 Prepaid Tour Costs), $147.50 (6810 Bank & FX Fees), $200.00 (6410, Claude under the existing Anthropic vendor) and $113.44 (1250 Employee Receivable, ruling P-0317); this becomes a proposed work item; the Controller approves it; the roles check blocks self-approval; the gateway posts to the GL and writes a hash-chained audit row.
+
+---
+
 ## The Workbench: five tabs, five close problems (`make up` → http://localhost:8000)
 
 Each tab is one problem our accountant teammate described, in her words. Each has its own **raw, messy inputs**, an agent you can task with one click, and a pipeline where **every stage logs what it did**. Every log line is a row in the hash-chained audit log. Nothing changes a system of record until the Controller approves it. Only the Gateway applies changes.
