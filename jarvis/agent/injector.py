@@ -87,18 +87,27 @@ def parse(text: str) -> tuple[str, dict]:
             params["description"] = caps[0].upper()
             params["vendor"] = caps[0]
     
-    # Extract cardholder name
-    cardholder = re.search(r'cardholder[:\s]+([A-Z]\.\s*[A-Z][a-z]+)', text)
+    # Extract cardholder name (handle "Maya's card" or "cardholder: J. Ortiz")
+    cardholder = re.search(r"([A-Z][a-z]+)'s card", text)
     if cardholder:
         params["cardholder"] = cardholder.group(1)
+    else:
+        cardholder = re.search(r'cardholder[:\s]+([A-Z]\.\s*[A-Z][a-z]+)', text)
+        if cardholder:
+            params["cardholder"] = cardholder.group(1)
     
     # Classify scenario type
     if "paypal" in t:
         k = "paypal_bundle"
     elif "bank" in t and ("change" in t or "detail" in t or "fraud" in t or "vendor" in t):
         k = "vendor_bank_change"
-    elif "split" in t or ("under" in t and "threshold" in t):
+    elif "split" in t or ("under" in t and ("threshold" in t or "limit" in t)) or re.search(r'(three|multiple|several)\s+.*\$[\d,]+.*charges', t):
         k = "split_purchases"
+        # Extract number of charges and amount
+        num_match = re.search(r'(three|four|five|2|3|4|5)\s+', t)
+        if num_match:
+            num_map = {"three": 3, "four": 4, "five": 5, "2": 2, "3": 3, "4": 4, "5": 5}
+            params["count"] = num_map.get(num_match.group(1), 3)
     elif "ghost" in t or ("vendor" in t and ("fake" in t or "doesn't exist" in t or "no record" in t)):
         k = "ghost_vendor"
     elif "refund" in t and "revenue" in t:
