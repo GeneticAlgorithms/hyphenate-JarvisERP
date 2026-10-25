@@ -12,8 +12,10 @@ from jarvis.api import server
 # Use TestClient instead of real server
 @pytest.fixture(scope="module")
 def client():
-    """Create test client."""
+    """Create test client with speed=0 for deterministic tests."""
     with TestClient(server.app) as c:
+        # Set speed to 0 to eliminate test timeouts
+        c.post("/api/wb/speed", json={"speed": 0})
         yield c
 
 TABS = [
