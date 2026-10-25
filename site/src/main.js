@@ -541,7 +541,7 @@ function initScrollAnimations() {
   });
 
   // Section 9: Proof - Score cards
-  gsap.utils.toArray('.score-card').forEach((card, index) => {
+  gsap.utils.toArray('.fact-card').forEach((card, index) => {
     gsap.to(card, {
       opacity: 1,
       scale: 1,
@@ -599,9 +599,13 @@ function initPresentMode() {
         <div class="slide-content slide-hero">
           <div class="slide-eyebrow">Cal Hacks 2026 · Hyphenate Track</div>
           <h1 class="slide-title">An autonomous Staff Accountant<br>you could actually hire</h1>
-          <p class="slide-subtitle">JarvisERP fills Afterglow Labs' Staff Accountant and Vendor-Master seats.<br>
+          <p class="slide-subtitle">JarvisERP fills Afterglow Labs' Staff Accountant seat.<br>
           It reconciles three systems that never agree, books accruals, keeps vendors deduplicated—<br>
           and cannot pass anything to humans without Controller hash-approval.</p>
+          <div class="slide-credits">
+            <p class="credit-line">Built solo by Alexander Le · UC Berkeley, with Cursor and Grok Bot</p>
+            <p class="inspiration-line">Inspired by my best friend, an accountant. These are the real close pain points they deal with.</p>
+          </div>
         </div>
       `
     },
@@ -643,7 +647,7 @@ function initPresentMode() {
         </div>
       `
     },
-    // Slide 3: Company & Seats
+    // Slide 3: Company & Seat
     {
       title: 'Afterglow Labs',
       render: () => `
@@ -654,15 +658,11 @@ function initPresentMode() {
             <h3>Audio-Visual Touring Studio</h3>
             <p>28-person Bay Area studio producing live-visual shows for festivals and clubs.</p>
           </div>
-          <h3 class="slide-subheading">Seats Jarvis Fills</h3>
+          <h3 class="slide-subheading">Seat Jarvis Fills</h3>
           <div class="slide-seats">
-            <div class="slide-seat">
+            <div class="slide-seat slide-seat-solo">
               <div class="seat-name">Staff Accountant</div>
-              <div class="seat-duties">Cash & expense close, reconciliation, accruals</div>
-            </div>
-            <div class="slide-seat">
-              <div class="seat-name">Vendor-Master Clerk</div>
-              <div class="seat-duties">Deduplicate vendors, maintain canonical list</div>
+              <div class="seat-duties">Cash & expense close, reconciliation, accruals, vendor deduplication</div>
             </div>
           </div>
         </div>
@@ -869,25 +869,25 @@ function initPresentMode() {
       title: 'Proof',
       render: () => `
         <div class="slide-content slide-proof">
-          <h2 class="slide-heading">Proof: Real vs Simulation</h2>
+          <h2 class="slide-heading">Proof: Verifiable facts from the demo</h2>
           <div class="slide-proof-grid">
             <div class="slide-proof-card">
-              <div class="proof-label">Correctness</div>
-              <div class="proof-score">92%</div>
-              <div class="proof-desc">Match on 134 real transactions</div>
+              <div class="proof-label">Balances</div>
+              <div class="proof-score">$3,912.44 = $3,912.44</div>
+              <div class="proof-desc">To the cent, every transaction</div>
             </div>
             <div class="slide-proof-card">
-              <div class="proof-label">Speed</div>
-              <div class="proof-score">&lt;1s</div>
-              <div class="proof-desc">Per transaction, including evidence fetch</div>
+              <div class="proof-label">Self-Approval Block</div>
+              <div class="proof-score">HTTP 403</div>
+              <div class="proof-desc">Jarvis cannot approve its own proposals</div>
             </div>
             <div class="slide-proof-card">
-              <div class="proof-label">Audit Coverage</div>
-              <div class="proof-score">100%</div>
-              <div class="proof-desc">Every write logged & hash-chained</div>
+              <div class="proof-label">Audit Trail</div>
+              <div class="proof-score">Hash-chained</div>
+              <div class="proof-desc">Append-only log with tamper check</div>
             </div>
           </div>
-          <p class="slide-note">Simulation harness replays real transactions, measures delta</p>
+          <p class="slide-note">Answer key on every tab · Score: measured live in the demo</p>
         </div>
       `
     },

@@ -310,6 +310,28 @@ h3 { font-size: 1.75rem; margin-bottom: 1rem; }
   font-weight: 600;
 }
 
+.hero-credits {
+  margin: 2rem auto 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--line);
+  max-width: 800px;
+  text-align: center;
+}
+
+.hero-credits .credit-line {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--maroon);
+  margin-bottom: 0.5rem;
+}
+
+.hero-credits .inspiration-line {
+  font-size: 0.95rem;
+  color: var(--ink2);
+  font-style: italic;
+  line-height: 1.6;
+}
+
 .hero-cta {
   display: flex;
   gap: 1rem;
@@ -1345,26 +1367,43 @@ h3 { font-size: 1.75rem; margin-bottom: 1rem; }
 }
 
 /* Proof Section */
-.score-grid {
+.proof-facts {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 2rem;
   margin-bottom: 3rem;
 }
 
-.score-card {
-  background: var(--card);
+.fact-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
   border: 2px solid var(--line);
-  border-radius: 12px;
+  border-radius: 16px;
   padding: 2rem;
   text-align: center;
   opacity: 0;
   transform: scale(0.9);
+  box-shadow: var(--shadow-sm);
 }
 
-.jarvis-score {
-  border-color: var(--green);
-  background: rgba(47, 125, 74, 0.05);
+.fact-label {
+  font: 700 12px var(--sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--orange);
+  margin-bottom: 1rem;
+}
+
+.fact-value {
+  font: 700 2rem var(--sans);
+  color: var(--maroon);
+  margin-bottom: 0.5rem;
+}
+
+.fact-detail {
+  font-size: 14px;
+  color: var(--ink2);
+  line-height: 1.5;
 }
 
 .baseline-score {
@@ -1749,6 +1788,27 @@ h3 { font-size: 1.75rem; margin-bottom: 1rem; }
   margin: 0 auto;
 }
 
+.slide-credits {
+  margin-top: var(--space-xl);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--line);
+  max-width: 900px;
+}
+
+.credit-line {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--maroon);
+  margin-bottom: var(--space-xs);
+}
+
+.inspiration-line {
+  font-size: 0.95rem;
+  color: var(--ink2);
+  font-style: italic;
+  line-height: 1.6;
+}
+
 /* Slide 2: Moment - 4 split cards */
 .slide-moment {
   max-width: 1200px;
@@ -1867,6 +1927,12 @@ h3 { font-size: 1.75rem; margin-bottom: 1rem; }
   grid-template-columns: repeat(2, 1fr);
   gap: var(--space-lg);
   margin-top: var(--space-lg);
+}
+
+.slide-seat-solo {
+  grid-column: 1 / -1;
+  max-width: 600px;
+  margin: 0 auto;
 }
 
 .slide-seat {

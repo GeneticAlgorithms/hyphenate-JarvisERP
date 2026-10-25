@@ -42,10 +42,14 @@
           you could actually hire
         </h1>
         <p class="hero-subtitle">
-          JarvisERP fills Afterglow Labs' Staff Accountant and Vendor-Master seats.<br/>
+          JarvisERP fills Afterglow Labs' Staff Accountant seat.<br/>
           It reconciles three systems that never agree, books accruals, keeps vendors deduplicated —<br/>
           and <strong>cannot post anything its human Controller hasn't approved</strong>.
         </p>
+        <div class="hero-credits">
+          <p class="credit-line">Built solo by Alexander Le · UC Berkeley, with Cursor and Grok Bot</p>
+          <p class="inspiration-line">Inspired by my best friend, an accountant. These are the real close pain points they deal with.</p>
+        </div>
         <div class="hero-cta">
           <a href="http://localhost:8000" class="btn-primary large" target="_blank">Try the Live Demo</a>
           <button class="btn-ghost large" onclick="document.getElementById('moment').scrollIntoView({behavior: 'smooth'})">
@@ -686,57 +690,35 @@
       <div class="container">
         <div class="section-header">
           <div class="eyebrow">09 · Proof It Works</div>
-          <h2>Real scores, <span class="highlight">planted errors</span>, answer key</h2>
+          <h2>Verifiable facts, <span class="highlight">answer key</span>, live demo</h2>
         </div>
 
         <div class="proof-content">
-          <!-- Scores -->
-          <div class="score-grid">
-            <div class="score-card jarvis-score">
-              <div class="score-label">Jarvis</div>
-              <div class="score-value">100%</div>
-              <div class="score-detail">6 seeds, 44–47 items each</div>
+          <!-- Verifiable Facts -->
+          <div class="proof-facts">
+            <div class="fact-card">
+              <div class="fact-label">Balances to the cent</div>
+              <div class="fact-value">$3,912.44 = $3,912.44</div>
+              <div class="fact-detail">Every transaction, every time</div>
             </div>
-            <div class="score-card baseline-score">
-              <div class="score-label">Rules-based Baseline</div>
-              <div class="score-value">61–64%</div>
-              <div class="score-detail">Bank feed auto-match</div>
+            <div class="fact-card">
+              <div class="fact-label">Self-approval block</div>
+              <div class="fact-value">HTTP 403</div>
+              <div class="fact-detail">Jarvis cannot approve its own proposals</div>
             </div>
-          </div>
-
-          <!-- Breakdown -->
-          <div class="proof-breakdown">
-            <h3>What's Being Tested</h3>
-            <div class="proof-table">
-              <div class="proof-row">
-                <div class="proof-metric">September items fully correct</div>
-                <div class="proof-jarvis">100%</div>
-                <div class="proof-baseline">61–64%</div>
-              </div>
-              <div class="proof-row">
-                <div class="proof-metric">Issues detected (recall)</div>
-                <div class="proof-jarvis">100%</div>
-                <div class="proof-baseline">74%</div>
-              </div>
-              <div class="proof-row">
-                <div class="proof-metric">Exact entry (account + amount)</div>
-                <div class="proof-jarvis">100%</div>
-                <div class="proof-baseline">45%</div>
-              </div>
-              <div class="proof-row">
-                <div class="proof-metric">Traps left alone (false positives)</div>
-                <div class="proof-jarvis">100%</div>
-                <div class="proof-baseline">100%</div>
-              </div>
-              <div class="proof-row">
-                <div class="proof-metric">Asked human when needed</div>
-                <div class="proof-jarvis">100%</div>
-                <div class="proof-baseline">71%</div>
-              </div>
+            <div class="fact-card">
+              <div class="fact-label">Hash-chained audit log</div>
+              <div class="fact-value">Append-only</div>
+              <div class="fact-detail">Tampering breaks the chain forward</div>
+            </div>
+            <div class="fact-card">
+              <div class="fact-label">Answer key on every tab</div>
+              <div class="fact-value">✓</div>
+              <div class="fact-detail">Score: measured live in the demo</div>
             </div>
           </div>
 
-          <!-- Real vs Simulated -->
+          <!-- How It's Tested -->
           <div class="real-vs-sim">
             <h3>What's Real vs Simulated</h3>
             <div class="rvs-grid">
