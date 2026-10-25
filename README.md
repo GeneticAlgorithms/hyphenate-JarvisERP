@@ -61,6 +61,7 @@ Full report: [`evals/REPORT.md`](evals/REPORT.md). Reproduce with `make eval`.
 
 **Honest caveats:**
 
+- The Elastic backend and the Claude layer are implemented but haven't run against a live cluster or a live key in this build (neither was configured). Everything above was measured on the local deterministic path, and both integrations fall back to it on any error.
 - Seeds vary amounts, dates, merchants, hours and FX, but share the scenario *structure*. 100% across seeds shows determinism and correctness on this world; it doesn't prove generalization. That's what the injector and the live judge scenarios are for.
 - The Controller is a scripted persona unless `ANTHROPIC_API_KEY` is set.
 

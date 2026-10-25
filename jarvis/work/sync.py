@@ -144,7 +144,7 @@ def _sync_paypal(db: DB, world: Path, months: list[str]) -> dict:
             except ConnectionError as e:
                 total["api_failures"] += 1
                 with db.tx():
-                    append_audit(db, SYNC, "fetch_failed", f"paypal:{mon}", False,
+                    append_audit(db, SYNC, "fetch_failed", f"paypal:{mon}", True,
                                  f"{e} (attempt {attempt + 1}/3, backing off {0.2 * 2 ** attempt:.1f}s)")
                 time.sleep(0.2 * 2 ** attempt)
         if rows is None:

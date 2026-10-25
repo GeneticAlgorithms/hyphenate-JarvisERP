@@ -60,9 +60,12 @@ def parse(text: str) -> tuple[str, dict]:
     params = dict(TEMPLATES[k]["params"])
     if amount and k != "paypal_bundle":
         params["amount"] = amount
-    q = re.search(r"['\"]([^'\"]{3,40})['\"]", text)
+    q = re.search(r'"([^"]{3,40})"', text) or re.search(r"(?<![A-Za-z])'([^']{3,40})'(?![A-Za-z])", text)
     if q and k == "unknown_debit":
         params["description"] = q.group(1).upper()
+    dm = re.search(r"\b(9|10)/(\d{1,2})\b", text)
+    if dm and "date" in params:
+        params["date"] = f"2026-{int(dm.group(1)):02d}-{int(dm.group(2)):02d}"
     for v in bible.VENDORS:
         if v["qbo_name"].lower().split()[0] in t and k in ("invoice_over_accrual", "duplicate_bill"):
             params["vendor"] = v["qbo_name"]

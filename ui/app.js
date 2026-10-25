@@ -17,7 +17,7 @@ const COLORS = {
 };
 const STATE_COLORS = { NEW: '#E6F7FF', PROPOSED: '#FFF58A', NEEDS_INFO: '#FFB38A', APPROVED: '#7CFFC4', POSTED: '#7CFFC4', REJECTED: '#FF8AD8', DISMISSED: '#6B6690' };
 const LINK_COLORS = { supports: 'rgba(124,255,196,0.55)', contradicts: 'rgba(255,138,216,0.85)', context: 'rgba(185,166,255,0.18)', policy: 'rgba(124,255,196,0.35)', precedent: 'rgba(79,216,160,0.35)', evidence: 'rgba(79,216,160,0.28)', posted: 'rgba(255,245,138,0.7)', approval: 'rgba(230,247,255,0.55)', revision: 'rgba(255,179,138,0.8)', denied: 'rgba(255,94,138,0.9)' };
-const LAYER_X = [-480, -240, 0, 240, 480];
+const LAYER_X = [-400, -200, 0, 200, 400];
 
 let G, graphData = { nodes: [], links: [] }, nodeIndex = new Map(), selected = null, STATE = {};
 const pulses = new Map();
@@ -52,9 +52,9 @@ function initGraph() {
     .d3VelocityDecay(0.35);
   G.d3Force('charge').strength(-38);
   G.d3Force('link').distance(l => 60);
-  G.cameraPosition({ x: 0, y: 0, z: 900 });
+  G.cameraPosition({ x: 0, y: 0, z: 1000 });
   const reset = document.createElement('button'); reset.textContent = '⊙ reset view'; reset.className = 'btn'; reset.id = 'resetView';
-  reset.onclick = () => G.cameraPosition({ x: 0, y: 0, z: 900 }, { x: 0, y: 0, z: 0 }, 800); $('#center').appendChild(reset);
+  reset.onclick = () => G.cameraPosition({ x: 0, y: 0, z: 1000 }, { x: 0, y: 0, z: 0 }, 800); $('#center').appendChild(reset);
   const resize = () => { const r = $('#center').getBoundingClientRect(); G.width(r.width).height(r.height); };
   window.addEventListener('resize', resize); resize();
   setInterval(() => {
@@ -287,7 +287,7 @@ async function showPack() {
 function toast(msg, cls = '') { const d = document.createElement('div'); d.className = 'toast ' + cls; d.textContent = msg; $('#toasts').appendChild(d); setTimeout(() => d.remove(), 6000); }
 function tick(ev) {
   const d = document.createElement('div');
-  d.className = (ev.allowed === false ? 'denied ' : '') + (ev.actor || '');
+  d.className = (ev.allowed === false ? 'denied ' : '') + (ev.actor || '') + (/fail|fallback/.test(ev.action) ? ' fault' : '');
   d.textContent = `${ev.allowed === false ? '✗ ' : ''}${ev.actor} · ${ev.action} · ${ev.subject}${ev.reason ? ' — ' + ev.reason : ''}`;
   const t = $('#ticker'); t.prepend(d); while (t.children.length > 9) t.lastChild.remove();
 }

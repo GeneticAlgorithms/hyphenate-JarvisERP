@@ -35,11 +35,14 @@ class ElasticBackend:
         return True
 
     def _inference_available(self) -> bool:
+        mode = (config.env("JARVIS_ELASTIC_SEMANTIC", "auto") or "auto").lower()
+        if mode == "off":
+            return False
         try:
-            eps = self.es.inference.get()
-            return bool(eps.get("endpoints"))
+            eps = self.es.inference.get().body.get("endpoints", [])
         except Exception:
             return False
+        return bool(eps) if mode in ("auto", "on") else False
 
     def _ensure(self):
         if self._ready:
@@ -48,10 +51,10 @@ class ElasticBackend:
         for kind in KINDS + ("audit",):
             name = idx(kind)
             if self.es.indices.exists(index=name):
-                m = self.es.indices.get_mapping(index=name)
-                props = m[name]["mappings"].get("properties", {})
-                if "text_sem" in props:
-                    self.semantic = self.semantic and True
+                if kind != "audit":
+                    m = self.es.indices.get_mapping(index=name).body
+                    props = m[name]["mappings"].get("properties", {})
+                    self.semantic = self.semantic and "text_sem" in props
                 continue
             props = {"kind": {"type": "keyword"}, "id": {"type": "keyword"}, "meta": {"type": "object", "dynamic": True},
                      "text": {"type": "text"}}
