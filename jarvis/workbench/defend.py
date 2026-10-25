@@ -101,19 +101,22 @@ def _mind_changers(it):
 def _classify_challenge(question: str) -> str:
     """Classify challenge type: purpose, period, amount, identity, policy, materiality."""
     q = question.lower()
-    # Check materiality FIRST before 'why not' can match
-    if any(w in q for w in ("materiality", "immaterial", "small", "under", "threshold", "does it matter", "just expense it")):
+    # Check policy/precedent FIRST - look for explicit policy questions
+    if any(phrase in q for phrase in ("last time", "policy", "precedent", "always", "usually", "why change")):
+        return "policy"  # Policy/precedent application
+    # Check materiality - use word boundaries for "under" to avoid matching "understand"
+    import re
+    if any(w in q for w in ("materiality", "immaterial", "small", "threshold", "does it matter", "just expense it")) or \
+       re.search(r'\bunder\b', q):
         return "materiality"  # Materiality threshold
     if any(w in q for w in ("what is", "what's", "who is", "merchant", "vendor", "this payment", "company")):
         return "identity"  # Who/what is this vendor/transaction
-    if any(w in q for w in ("when", "period", "month", "september", "october", "timing", "accrual", "cut-off", "prepaid")):
+    if any(w in q for w in ("when", "period", "month", "september", "october", "timing", "accrual", "cut-off", "prepaid", "should", "booked")):
         return "period"  # When to recognize/which period
     if any(w in q for w in ("how much", "amount", "$", "too much", "too little", "wrong amount")):
         return "amount"  # Dollar amount questioned
     if any(w in q for w in ("why", "purpose", "what for", "category", "account", "expense", "revenue", "classify")):
         return "purpose"  # What is this transaction for/how to categorize
-    if any(w in q for w in ("policy", "rule", "always", "usually", "precedent", "last time", "should")):
-        return "policy"  # Policy/precedent application
     return "general"
 
 
@@ -176,15 +179,30 @@ def _address(question, it):
         return ("Materiality decides whether a misstatement matters, not how to classify a transaction."
                 + (" The personal purchase is a control issue, and ruling P-0317 applies regardless of size." if personal else ""))
     elif challenge_type == "policy":
+        # Give specific policy/precedent answer with history
+        if kind == "bank_categorize" or kind == "paypal_split":
+            policy_refs = it.get("policy_id") or "current policy"
+            precedent_refs = ", ".join(it.get("precedent_ids", [])) if it.get("precedent_ids") else "none"
+            return (f"Last month's categorization isn't a binding precedent for a different transaction. "
+                    f"This decision follows {policy_refs} (precedents: {precedent_refs}). "
+                    f"The documents for this transaction — the SOW, receipt, and payment record — point to these specific accounts.")
         return "Last month's habit isn't evidence about this month's transaction. The documents for this one point elsewhere."
     elif challenge_type == "period":
+        # Give specific period/prepaid explanation
+        prepaid = any(l["acct"] == "1310" for l in lines)
+        if prepaid:
+            prepaid_line = next(l for l in lines if l["acct"] == "1310")
+            memo = prepaid_line.get("memo", "")
+            return (f"This is a deposit for a future event ({memo}). Under cut-off policy, costs are recognized "
+                    f"when earned/incurred, not when paid. The {fmt(prepaid_line['cents'])} goes to 1310 Prepaid "
+                    f"(asset) in September, then to expense when the event happens (November). Booking it as "
+                    f"September expense would overstate the period's costs.")
         return "Waiting books September cost in October. The close is about the period the work happened, not when paper arrives."
     elif challenge_type == "identity" or challenge_type == "purpose":
         return f"Confidence is {round((it.get('confidence') or 0) * 100)}% because each step below is backed by a source document."
     elif challenge_type == "amount":
-        # Sum only one side (debits or credits), not both
-        total = sum(l.get("cents", 0) for l in lines if l.get("cents", 0) != 0)
-        total = abs(total) // 2 if len([l for l in lines if l.get("cents", 0) != 0]) > 1 else abs(total)
+        # Sum debits only (positive cents) to avoid double-counting in double-entry
+        total = sum(l.get("cents", 0) for l in lines if l.get("cents", 0) > 0)
         return f"Total {fmt(total)} ties to source documents. Each line is computed from receipts/contracts, not estimated."
     else:
         return "Here is what the decision rests on."
@@ -194,26 +212,63 @@ def defend(run, it, question: str) -> dict:
     if run is None:
         return {"points": [], "error": "run no longer in memory"}
     run.cur = run.stages[-1]["key"]
-    run.moment("defended", "decide", f"Challenge on {it['item_id']} ({it['title']}): "{question}". Defending from the evidence:",
+    run.moment("defended", "decide", f"Challenge on {it['item_id']} ({it['title']}): \"{question}\". Defending from the evidence:",
                {"item_id": it["item_id"], "question": question}, pause=0.6)
     
     # Check for concession - if evidence contradicts, withdraw immediately
     concession = _check_concession(question, it)
     if concession:
-        from jarvis.work.transition import transition
-        from jarvis.work.roles import JARVIS
+        from jarvis.work.transition import transition, create_item
+        from jarvis.work.roles import actor
+        from jarvis.work.db import exec_sql
+        from jarvis.agent.context import SYNC
         
         try:
             # Execute withdrawal transition
-            transition(run.wb.db, it["item_id"], "withdraw", JARVIS, 
+            jarvis = actor("jarvis")
+            transition(run.wb.db, it["item_id"], "withdraw", jarvis, 
                       {"concession": concession}, 
                       reason=f"Conceding: {concession['reason']}")
+            
+            # Record as precedent
+            exec_sql(run.wb.db, 
+                    "INSERT INTO precedents (date, kind, question, answer, item_id, created_at) VALUES (?, ?, ?, ?, ?, datetime('now'))",
+                    ("2026-09", it["kind"], question[:500], concession["reason"], it["item_id"]))
+            
             run.log("decide", f"**CONCEDING**: {concession['reason']}", pause=1.0)
-            run.log("decide", "Proposal withdrawn — corrected version will be generated in next run", pause=0.8)
+            run.log("decide", "Precedent recorded. Re-proposing with correction...", pause=0.5)
+            
+            # Immediately re-propose with corrected data
+            corrected_proposal = dict(it["proposal"])
+            if "new_amount" in concession:
+                # Adjust amounts proportionally
+                old_total = sum(abs(l.get("cents", 0)) for l in corrected_proposal.get("lines", []))
+                scale = concession["new_amount"] / old_total if old_total > 0 else 1.0
+                for line in corrected_proposal.get("lines", []):
+                    if line.get("cents", 0) != 0:
+                        line["cents"] = int(line["cents"] * scale)
+            
+            if "new_date" in concession:
+                corrected_proposal["date"] = concession["new_date"]
+            
+            # Create new work item with correction
+            new_it = create_item(run.wb.db, SYNC, it["kind"], 
+                               f"{it['anchor']}-corrected", 
+                               f"{it['title']} (corrected per Controller)",
+                               it["period"], it.get("tags", []))
+            
+            transition(run.wb.db, new_it["item_id"], "propose", jarvis,
+                      {"proposal": corrected_proposal,
+                       "evidence": it.get("evidence", []),
+                       "rationale": f"Corrected: {concession['reason']}",
+                       "confidence": it.get("confidence", 0.9)},
+                      reason=f"Re-proposed after concession: {concession['reason'][:200]}")
+            
+            run.log("decide", f"Re-proposed as {new_it['item_id']}", pause=0.8)
             
             points = [f"**CONCEDING**: {concession['reason']}. {concession['action']}."]
-            points.append("The original proposal has been withdrawn. A corrected proposal will appear in the next run.")
-            return {"points": points, "item_id": it["item_id"], "conceded": True}
+            points.append(f"Precedent recorded. Original proposal withdrawn. Corrected as {new_it['item_id']}.")
+            return {"points": points, "item_id": it["item_id"], "new_item_id": new_it["item_id"], "conceded": True}
         except Exception as e:
             run.log("warn", f"Concession failed: {e}", pause=0.5)
             # Fall through to normal defense
