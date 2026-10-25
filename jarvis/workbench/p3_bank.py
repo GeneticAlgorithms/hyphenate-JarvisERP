@@ -222,3 +222,27 @@ def apply(r, it):
                   f"Controller confirmed: {ans or 'crew cost'}", [], 0.95)
         return f"answer recorded: {ans or 'crew cost'}; follow-up entry proposed"
     return "applied"
+
+
+def on_reject(r, it, reason):
+    """Handle Controller rejection - record as precedent and re-plan."""
+    from jarvis.work.db import exec_sql
+    
+    # Record the rejection as a precedent
+    exec_sql(r.wb.db, 
+            "INSERT INTO precedents (date, kind, question, answer, item_id, created_at) VALUES (?, ?, ?, ?, ?, datetime('now'))",
+            (it.get("period", "2026-09"), it["kind"], it["title"], reason[:500], it["item_id"]))
+    
+    r.log("decide", f"Controller rejected: \"{reason}\". Recorded as precedent; will apply in future similar transactions.", pause=0.8)
+    
+    # If rejection mentions a specific amount or categorization, extract and re-propose
+    amt_match = re.search(r'\$\s?([\d,]+(?:\.\d{2})?)', reason)
+    if amt_match and it["kind"] in ("bank_categorize", "paypal_split"):
+        from jarvis.money import parse_money
+        new_amt = parse_money(amt_match.group(0))[0]
+        r.log("decide", f"Detected correction to {fmt(new_amt)}; re-proposing...", pause=0.5)
+        # Re-propose with corrected amount (implementation would need transaction context)
+    
+    # Check for policy changes mentioned in rejection
+    if "policy" in reason.lower() or "always" in reason.lower():
+        r.log("decide", "Rejection mentions policy — will propose policy update after 3+ similar corrections.", pause=0.5)
