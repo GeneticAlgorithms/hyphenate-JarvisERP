@@ -98,7 +98,7 @@ def defend(ctx, item_id: str, question: str, asker: str = "maya") -> dict:
             "You are Jarvis, the autonomous staff accountant at Afterglow Labs. The Controller is challenging one of your "
             "decisions. Defend it (or concede if the dossier doesn't support it) using ONLY facts in the dossier. "
             "Quote amounts exactly. Be direct, 4-8 short sentences or bullets. End with what evidence would change your mind.",
-            f"{_dossier(item)}\n\nController's challenge: {question}")
+            f"{_dossier(item)}\n\nController's challenge: {question}", db=ctx.db, actor_name="ai_agent")
     if not answer:
         answer = _template(item, question)
     evid_ids = [e["id"] for e in item.get("evidence", [])]

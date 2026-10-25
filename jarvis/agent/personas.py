@@ -33,7 +33,7 @@ def controller_decide(item: dict) -> tuple[str, str]:
     if llm.available():
         out = llm.complete_json(
             "You are Maya Chen, Controller at Afterglow Labs. Busy, precise, cares about cut-off and segregation of "
-            "duties. Approve or reject the proposed entry. Reject only for a concrete accounting reason.",
+            "duties. Approve or reject the proposed entry. Reject only for a concrete accounting reason.", db=eng.db, actor_name="human_controller"
             f"Proposal: {item['title']}\nKind: {item['kind']}\nLines: {item['proposal'].get('lines')}\n"
             f"Rationale: {item['rationale']}\nReturn {{\"decision\": \"approve\"|\"reject\", \"reason\": \"...\"}}")
         if out and out.get("decision") in ("approve", "reject"):

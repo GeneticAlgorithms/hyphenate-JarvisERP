@@ -46,13 +46,15 @@ TEMPLATES = {
 def parse(text: str) -> tuple[str, dict]:
     """Parse free text into scenario template and parameters. Extract real values from text."""
     if llm.available():
+        from jarvis.work.db import DB
+        db = DB.get_current() if hasattr(DB, 'get_current') else None
         out = llm.complete_json(
             "Extract finance scenario details from user text. Return JSON with: template (one of: unknown_debit, "
             "personal_card, duplicate_bill, invoice_over_accrual, paypal_bundle, vendor_bank_change, split_purchases, "
             "ghost_vendor, refund_as_revenue), params (object with: amount in dollars as number, merchant/vendor name "
             "as written, date YYYY-MM-DD in Sept 2026 unless Oct specified, cardholder name if mentioned). "
             "Extract merchant/vendor name EXACTLY as user typed it.",
-            f"User scenario: {text}")
+            f"User scenario: {text}", db=db, actor_name="sync")
         if out and out.get("template") in TEMPLATES:
             # Use LLM-extracted params, fallback to template defaults
             return out["template"], {**TEMPLATES[out["template"]]["params"], **(out.get("params") or {})}
