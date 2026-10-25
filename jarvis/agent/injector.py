@@ -105,7 +105,7 @@ def parse(text: str) -> tuple[str, dict]:
         k = "refund_as_revenue"
     elif "invoice" in t or ("bill" in t and ("more" in t or "over" in t or "higher" in t)):
         k = "invoice_over_accrual"
-    elif "duplicate" in t or "twice" in t or "both" in t:
+    elif "duplicate" in t or "twice" in t or "both" in t or "two bills" in t or "two invoices" in t:
         k = "duplicate_bill"
     elif any(w in t for w in ("personal", "nordstrom", "sephora", "steam", "gift", "makeup", "clothes")):
         k = "personal_card"
