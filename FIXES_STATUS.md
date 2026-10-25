@@ -54,9 +54,14 @@
 - ⚠️  refund_reclass still bypasses review - needs `eng.review()` call
 
 ### 9. LLM Extraction (Item 9)
-- ⚠️  Framework added but not tested (no API key in VM)
-- ⚠️  Needs: models API, timeout, validation, unit tests
-- ⚠️  User will test on demo machine
+- ✅ Dynamic model selection via models.list() API
+- ✅ Supports new naming: claude-sonnet-5-5, claude-haiku-5-5
+- ✅ Supports old naming: claude-3-5-sonnet-YYYYMMDD
+- ✅ 3-second timeout on LLM calls
+- ✅ Validation against vendor/employee lists
+- ✅ Parser badge shows: llm_success, llm_failed, deterministic_only
+- ✅ Graceful fallback to deterministic parser
+- ⚠️  Not tested in VM (no API key) - user will test on demo machine
 
 ## Not Invented / Creates needs_info ✅
 
@@ -173,14 +178,29 @@ Based on realistic judge prompts, here's what SHOULD happen:
 7. **EUR/FX handling**: Basic parsing works but PayPal bundle not fully tested
 8. **Date defaulting**: Currently no default date if not mentioned
 
+## LLM Implementation Details ✅
+
+When `ANTHROPIC_API_KEY` is present:
+1. **Dynamic model selection**: Queries models.list() for latest claude-sonnet-X-X and claude-haiku-X-X
+2. **JSON schema extraction**: Structured extraction with vendor/employee validation
+3. **3-second timeout**: Prevents slow LLM calls from blocking
+4. **Fuzzy matching**: Validates extracted vendors against master
+5. **Graceful fallback**: Falls back to deterministic parser on any error
+6. **Parser badge**: Response includes which parser succeeded:
+   - `llm_success`: LLM extraction worked
+   - `llm_failed`: LLM available but call failed (timeout/error)
+   - `deterministic_only`: No API key, used deterministic parser
+   - `none`: Empty input
+
 ## Code Quality ✅
 
-- ✅ 3 focused commits with clear messages
+- ✅ 5 focused commits with clear messages
 - ✅ No sprawling rewrites
 - ✅ Helper functions cleanly separated
 - ✅ Error handling with try/except
 - ✅ Audit trail for all paths
 - ✅ Deterministic path fully testable
+- ✅ LLM path with timeout and validation
 
 ## Verification Needed
 
