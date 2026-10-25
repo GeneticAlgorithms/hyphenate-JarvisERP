@@ -3,6 +3,7 @@ generator primitives (so free text can't corrupt the world), then Jarvis process
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import uuid
 
@@ -152,10 +153,64 @@ def _parse_split_purchases(text: str) -> dict:
 def parse(text: str) -> tuple[str, dict]:
     """Parse free text. NEVER INVENT FACTS - return needs_info if unclear."""
     if not text or not text.strip():
-        return "needs_info", {"error": "empty_text"}
+        return "needs_info", {"error": "empty_text", "_parser": "none"}
     
     t_lower = text.lower()
     params = {}
+    params["_parser"] = "deterministic"  # Default, may be overridden by LLM
+    
+    # Try LLM extraction first if available
+    if llm.available():
+        try:
+            # Build vendor list for validation
+            vendor_names = [v["qbo_name"] for v in bible.VENDORS]
+            employee_names = [p["name"] for p in bible.PEOPLE.values()]
+            
+            schema = {
+                "template": "one of: vendor_bank_change, split_purchases, ghost_vendor, refund_as_revenue, personal_card, duplicate_bill, invoice_over_accrual, paypal_bundle, needs_info",
+                "vendor": f"exact vendor name from this list: {', '.join(vendor_names[:10])}..., or stated name if not in list, or null",
+                "merchant": "merchant name as stated, or null",
+                "amount": "number in dollars (convert k→1000, m→1000000), or null if not stated",
+                "amounts": "array of charge amounts if multiple stated (exclude limit), or null",
+                "count": "number of charges if stated, or null",
+                "limit": "approval limit if mentioned, or null",
+                "cardholder": f"full name from: {', '.join(employee_names)}, or null",
+                "date": "YYYY-MM-DD in Sept/Oct 2026, or null if not stated",
+                "currency": "USD or EUR if stated, or null"
+            }
+            
+            llm_result = llm.complete_json(
+                f"Extract accounting scenario details. Schema: {json.dumps(schema)}. "
+                f"ONLY extract explicitly stated facts. Use null for unstated fields. "
+                f"Validate vendor/employee names against provided lists.",
+                f"Judge text: {text}",
+                fast=True,
+                timeout=3.0
+            )
+            
+            if llm_result and llm_result.get("template"):
+                # LLM extraction succeeded
+                params["_parser"] = "llm_success"
+                
+                # Validate and fuzzy-match vendor
+                if llm_result.get("vendor"):
+                    matched = _match_vendor(llm_result["vendor"])
+                    llm_result["vendor"] = matched["qbo_name"] if matched else llm_result["vendor"]
+                
+                # Merge LLM results, excluding template
+                params.update({k: v for k, v in llm_result.items() if v is not None and k != "template"})
+                
+                template = llm_result["template"]
+                if template in TEMPLATES or template == "needs_info":
+                    return template, params
+        except Exception as e:
+            # LLM failed - fall back to deterministic
+            params["_parser"] = "llm_failed"
+            params["_llm_error"] = str(e)[:100]
+    
+    # Deterministic parsing fallback
+    if params.get("_parser") == "deterministic":
+        params["_parser"] = "deterministic_only"  # No LLM available
     
     # Extract amount
     amount = _parse_amount(text)
@@ -299,9 +354,9 @@ def inject(session, text: str | None = None, template: str | None = None, params
             it = transition(db, it["item_id"], "ask", JARVIS, patch, reason=rationale)
             created.append(it)
             
-            return {"template": "needs_info", "params": params,
+            return {"template": "needs_info", "params": params, "parser": params.get("_parser", "deterministic"),
                     "items": [{"item_id": it["item_id"], "state": it["state"], "kind": it["kind"],
-                              "title": it["title"], "rationale": rationale}]}
+                              "title": it["title"], "rationale": rationale, "parser": params.get("_parser", "deterministic")}]}
         
         if template not in TEMPLATES:
             with db.tx():
@@ -398,9 +453,9 @@ def inject(session, text: str | None = None, template: str | None = None, params
             it = transition(db, it["item_id"], "ask", JARVIS, patch, reason=rationale)
             created.append(it)
             created = [c for c in created if c]
-            return {"template": template, "params": params,
+            return {"template": template, "params": params, "parser": params.get("_parser", "deterministic"),
                     "items": [{"item_id": c["item_id"], "state": c["state"], "kind": c["kind"], "title": c["title"],
-                              "rationale": c.get("rationale", "")} for c in created]}
+                              "rationale": c.get("rationale", ""), "parser": params.get("_parser", "deterministic")} for c in created]}
         
         cents = abs(to_cents(params["amount"]))
         bill_id = f"BILL-INJ-{tag}"
@@ -712,6 +767,6 @@ def inject(session, text: str | None = None, template: str | None = None, params
         for it in eng.discover(d[:7]):
             created.append(eng.process_item(it, "bank_line"))
     created = [c for c in created if c]
-    return {"template": template, "params": params,
+    return {"template": template, "params": params, "parser": params.get("_parser", "deterministic"),
             "items": [{"item_id": c["item_id"], "state": c["state"], "kind": c["kind"], "title": c["title"],
-                       "rationale": c.get("rationale", "")} for c in created]}
+                       "rationale": c.get("rationale", ""), "parser": params.get("_parser", "deterministic")} for c in created]}
