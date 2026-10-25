@@ -32,44 +32,89 @@ TEMPLATES = {
                                                                      "item": "Crew fee Amsterdam 4 Oct"},
                                                                     {"name": "Splice.com, Inc.", "usd": 24.99,
                                                                      "item": "Splice Sounds subscription"}]}},
+    "vendor_bank_change": {"label": "Vendor changes bank account before payment",
+                          "params": {"vendor": "Lumen Crew LLC", "amount": 12000.00, "date": "2026-09-28"}},
+    "split_purchases": {"label": "Multiple small purchases under approval threshold",
+                       "params": {"merchant": "Office Depot", "amounts": [245.00, 235.00, 240.00], "date": "2026-09-20"}},
+    "ghost_vendor": {"label": "Payment to non-existent vendor",
+                    "params": {"vendor": "Advanced Solutions Inc", "amount": 8500.00, "date": "2026-09-22"}},
+    "refund_as_revenue": {"label": "Refund incorrectly booked as revenue",
+                         "params": {"merchant": "Bay Rig Rentals", "amount": 1200.00, "date": "2026-09-25"}},
 }
 
 
 def parse(text: str) -> tuple[str, dict]:
+    """Parse free text into scenario template and parameters. Extract real values from text."""
     if llm.available():
         out = llm.complete_json(
-            "Map the user's finance scenario to exactly one template and its params. Templates: " +
-            "; ".join(f"{k}: {v['label']} params={list(v['params'])}" for k, v in TEMPLATES.items()) +
-            ". Dates must be in 2026-09 unless the scenario says October. Amounts in dollars (number).",
-            text)
+            "Extract finance scenario details from user text. Return JSON with: template (one of: unknown_debit, "
+            "personal_card, duplicate_bill, invoice_over_accrual, paypal_bundle, vendor_bank_change, split_purchases, "
+            "ghost_vendor, refund_as_revenue), params (object with: amount in dollars as number, merchant/vendor name "
+            "as written, date YYYY-MM-DD in Sept 2026 unless Oct specified, cardholder name if mentioned). "
+            "Extract merchant/vendor name EXACTLY as user typed it.",
+            f"User scenario: {text}")
         if out and out.get("template") in TEMPLATES:
+            # Use LLM-extracted params, fallback to template defaults
             return out["template"], {**TEMPLATES[out["template"]]["params"], **(out.get("params") or {})}
+    
+    # Deterministic parsing: extract real parameters from text
     t = text.lower()
-    m = re.search(r"\$?\s?([\d,]+(?:\.\d{1,2})?)", text)
-    amount = float(m.group(1).replace(",", "")) if m else None
+    params = {}
+    
+    # Extract amount
+    m = re.search(r"\$\s?([\d,]+(?:\.\d{1,2})?)", text)
+    if m:
+        params["amount"] = float(m.group(1).replace(",", ""))
+    
+    # Extract date (9/15, Sept 15, September 15)
+    dm = re.search(r"\b(9|10|sept|september|oct|october)\D{0,5}(\d{1,2})\b", t)
+    if dm:
+        month = {"9": 9, "10": 10, "sept": 9, "september": 9, "oct": 10, "october": 10}[dm.group(1)]
+        day = int(dm.group(2))
+        params["date"] = f"2026-{month:02d}-{day:02d}"
+    
+    # Extract merchant/vendor name from quotes or capitalized words
+    quoted = re.search(r'"([^"]{2,40})"', text) or re.search(r"'([^']{2,40})'", text)
+    if quoted:
+        params["merchant"] = quoted.group(1)
+        params["description"] = quoted.group(1).upper()
+        params["vendor"] = quoted.group(1)
+    else:
+        # Try to find capitalized merchant names
+        caps = re.findall(r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b', text)
+        if caps and not any(w in text for w in ["PayPal", "Ramp", "Bank"]):
+            params["merchant"] = caps[0]
+            params["description"] = caps[0].upper()
+            params["vendor"] = caps[0]
+    
+    # Extract cardholder name
+    cardholder = re.search(r'cardholder[:\s]+([A-Z]\.\s*[A-Z][a-z]+)', text)
+    if cardholder:
+        params["cardholder"] = cardholder.group(1)
+    
+    # Classify scenario type
     if "paypal" in t:
         k = "paypal_bundle"
-    elif "invoice" in t or "bill" in t and ("more" in t or "over" in t or "higher" in t):
+    elif "bank" in t and ("change" in t or "detail" in t or "fraud" in t or "vendor" in t):
+        k = "vendor_bank_change"
+    elif "split" in t or ("under" in t and "threshold" in t):
+        k = "split_purchases"
+    elif "ghost" in t or ("vendor" in t and ("fake" in t or "doesn't exist" in t or "no record" in t)):
+        k = "ghost_vendor"
+    elif "refund" in t and "revenue" in t:
+        k = "refund_as_revenue"
+    elif "invoice" in t or ("bill" in t and ("more" in t or "over" in t or "higher" in t)):
         k = "invoice_over_accrual"
     elif "duplicate" in t or "twice" in t or "both" in t:
         k = "duplicate_bill"
-    elif any(w in t for w in ("personal", "sephora", "nordstrom", "steam", "gift", "makeup", "clothes")):
+    elif any(w in t for w in ("personal", "nordstrom", "sephora", "steam", "gift", "makeup", "clothes")):
         k = "personal_card"
     else:
         k = "unknown_debit"
-    params = dict(TEMPLATES[k]["params"])
-    if amount and k != "paypal_bundle":
-        params["amount"] = amount
-    q = re.search(r'"([^"]{3,40})"', text) or re.search(r"(?<![A-Za-z])'([^']{3,40})'(?![A-Za-z])", text)
-    if q and k == "unknown_debit":
-        params["description"] = q.group(1).upper()
-    dm = re.search(r"\b(9|10)/(\d{1,2})\b", text)
-    if dm and "date" in params:
-        params["date"] = f"2026-{int(dm.group(1)):02d}-{int(dm.group(2)):02d}"
-    for v in bible.VENDORS:
-        if v["qbo_name"].lower().split()[0] in t and k in ("invoice_over_accrual", "duplicate_bill"):
-            params["vendor"] = v["qbo_name"]
-    return k, params
+    
+    # Merge with template defaults, user params override
+    final_params = {**TEMPLATES[k]["params"], **params}
+    return k, final_params
 
 
 def _id(*parts) -> str:

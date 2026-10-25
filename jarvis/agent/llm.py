@@ -75,8 +75,10 @@ def complete(system: str, user: str, fast: bool = False, max_tokens: int = 700) 
     if not available():
         return None
     try:
+        models = _select_models()
+        model_id = models["fast"] if fast else models["reasoning"]
         msg = client().messages.create(
-            model=config.MODEL_FAST if fast else config.MODEL_REASONING, max_tokens=max_tokens,
+            model=model_id, max_tokens=max_tokens,
             system=system, messages=[{"role": "user", "content": user}])
         return "".join(b.text for b in msg.content if getattr(b, "type", "") == "text").strip()
     except Exception as e:  # network / quota - fall back to templates
@@ -99,17 +101,20 @@ def test_live() -> dict:
     global _llm_test_result
     
     if _llm_test_result is not None:
-        return {"status": "live" if _llm_test_result else "fallback", "tested": True, "cached": True}
+        models = _select_models()
+        return {"status": "live" if _llm_test_result else "fallback", "tested": True, "cached": True,
+                "models": models if _llm_test_result else None}
     
     if not available():
         _llm_test_result = False
         return {"status": "fallback", "tested": True, "reason": "no API key", "cached": False}
     
     try:
+        models = _select_models()
         result = complete("You are a test system.", "Respond with exactly: OK", fast=True, max_tokens=10)
         _llm_test_result = (result is not None)
         if _llm_test_result:
-            return {"status": "live", "tested": True, "model": config.MODEL_FAST, "cached": False}
+            return {"status": "live", "tested": True, "models": models, "cached": False}
         else:
             return {"status": "fallback", "tested": True, "reason": "API call failed", "cached": False}
     except Exception as e:
