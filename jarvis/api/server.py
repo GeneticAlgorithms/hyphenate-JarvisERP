@@ -124,6 +124,12 @@ def state():
             "templates": {k: v["label"] for k, v in injector.TEMPLATES.items()}}
 
 
+@app.get("/api/llm_status")
+def llm_status():
+    """Test if LLM is actually live (not just configured)."""
+    return llm.test_live()
+
+
 @app.get("/api/graph")
 def get_graph():
     return graph.build(S().db)

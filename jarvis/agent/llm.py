@@ -10,6 +10,9 @@ from jarvis import config
 _client = None
 
 
+_llm_test_result = None  # cache: None = not tested, True = live, False = failed
+
+
 def available() -> bool:
     return bool(config.ANTHROPIC_API_KEY)
 
@@ -43,3 +46,26 @@ def complete_json(system: str, user: str, fast: bool = True) -> dict | None:
         return json.loads(out[start:end])
     except Exception:
         return None
+
+
+def test_live() -> dict:
+    """Test if LLM is actually working with a real call. Returns status dict."""
+    global _llm_test_result
+    
+    if _llm_test_result is not None:
+        return {"status": "live" if _llm_test_result else "fallback", "tested": True, "cached": True}
+    
+    if not available():
+        _llm_test_result = False
+        return {"status": "fallback", "tested": True, "reason": "no API key", "cached": False}
+    
+    try:
+        result = complete("You are a test system.", "Respond with exactly: OK", fast=True, max_tokens=10)
+        _llm_test_result = (result is not None)
+        if _llm_test_result:
+            return {"status": "live", "tested": True, "model": config.MODEL_FAST, "cached": False}
+        else:
+            return {"status": "fallback", "tested": True, "reason": "API call failed", "cached": False}
+    except Exception as e:
+        _llm_test_result = False
+        return {"status": "fallback", "tested": True, "reason": str(e)[:100], "cached": False}

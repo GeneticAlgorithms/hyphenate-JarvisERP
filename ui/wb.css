@@ -32,6 +32,9 @@ button, select, textarea, input { font: inherit; color: inherit; }
 .chip { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px; font: 11.5px var(--mono); cursor: pointer; color: var(--ink2); }
 .chip.ok::before { content: "●"; color: var(--green); margin-right: 6px; }
 .chip.bad { border-color: var(--red); color: var(--red); }
+.llm-badge.live { background: var(--green); border-color: var(--green); color: #fff; font-weight: 500; }
+.llm-badge.fallback { background: var(--peach); border-color: var(--peach-line); color: var(--orange); }
+.llm-badge.error { background: var(--red); border-color: var(--red); color: #fff; }
 .ghost { background: transparent; border: 1px solid var(--line2); border-radius: 6px; padding: 5px 11px; cursor: pointer; color: var(--ink2); text-decoration: none; font-size: 12.5px; }
 .ghost:hover { border-color: var(--maroon); color: var(--maroon); }
 .ghost.on { background: var(--maroon); border-color: var(--maroon); color: #fff; }

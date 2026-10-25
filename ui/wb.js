@@ -56,6 +56,31 @@ async function boot() {
   $("#auditRun").onchange = e => loadAudit(e.target.value);
   $("#auditVerify").onclick = async () => { const v = await verifyChain(); $("#auditMsg").textContent = v.ok ?
     `✓ ${v.rows} rows re-hashed, chain intact · head ${v.head.slice(0, 16)}…` : `✗ chain broken at row ${v.broken_at}`; };
+  checkLLMStatus();
+  $("#llm-badge").onclick = checkLLMStatus;
+}
+
+async function checkLLMStatus() {
+  const badge = $("#llm-badge");
+  badge.textContent = "LLM: testing…";
+  badge.className = "chip llm-badge";
+  try {
+    const status = await api("/api/llm_status");
+    if (status.status === "live") {
+      badge.textContent = `LLM: ✓ LIVE`;
+      badge.className = "chip llm-badge live";
+      badge.title = `Claude ${status.model || "connected"} — real LLM responses`;
+    } else {
+      badge.textContent = `LLM: deterministic`;
+      badge.className = "chip llm-badge fallback";
+      const reason = status.reason ? ` (${status.reason})` : "";
+      badge.title = `Using deterministic templates${reason} — no API key or connection failed. System still fully functional.`;
+    }
+  } catch (e) {
+    badge.textContent = "LLM: error";
+    badge.className = "chip llm-badge error";
+    badge.title = `Error checking LLM: ${e.message}`;
+  }
 }
 const problem = () => S.problems.find(p => p.id === S.tab);
 function problemOfAgent(agent) { return S.problems.find(p => p.agents.includes(agent))?.id; }
