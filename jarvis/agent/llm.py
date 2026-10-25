@@ -102,7 +102,7 @@ def client():
     return _client
 
 
-def complete(system: str, user: str, fast: bool = False, max_tokens: int = 2000, db=None, actor_name: str = "ai_agent") -> str | None:
+def complete(system: str, user: str, fast: bool = False, max_tokens: int = 2000, db=None, actor_name: str = "jarvis") -> str | None:
     """Call LLM with optional audit logging. Pass db to log the call."""
     if not available():
         return None
