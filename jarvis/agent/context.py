@@ -90,7 +90,7 @@ class Ctx:
         return r["eur_usd"] if r else None
 
     def precedents(self, pattern: str | None = None) -> list[dict]:
-        rows = self.db.q("SELECT * FROM precedents WHERE status='approved'" + (" AND pattern=?" if pattern else "") +
+        rows = self.db.q("SELECT * FROM precedents WHERE status IN ('approved', 'active')" + (" AND pattern=?" if pattern else "") +
                          " ORDER BY date", (pattern,) if pattern else ())
         for p in rows:
             p["decision"] = L(p["decision"], {})

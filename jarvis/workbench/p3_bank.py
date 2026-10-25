@@ -239,10 +239,49 @@ def on_reject(r, it, reason):
     # If rejection mentions a specific amount or categorization, extract and re-propose
     amt_match = re.search(r'\$\s?([\d,]+(?:\.\d{2})?)', reason)
     if amt_match and it["kind"] in ("bank_categorize", "paypal_split"):
-        from jarvis.money import parse_money
-        new_amt = parse_money(amt_match.group(0))[0]
-        r.log("decide", f"Detected correction to {fmt(new_amt)}; re-proposing...", pause=0.5)
-        # Re-propose with corrected amount (implementation would need transaction context)
+        from jarvis.money import to_cents
+        # Parse the dollar amount
+        amt_str = amt_match.group(0).replace("$", "").replace(",", "")
+        new_amt = to_cents(amt_str)
+        r.log("decide", f"Detected correction to {fmt(new_amt)}; re-proposing with updated amount...", pause=0.5)
+        
+        # Create corrected proposal - adjust the largest expense line
+        import copy
+        corrected_proposal = copy.deepcopy(it["proposal"])
+        lines = corrected_proposal.get("lines", [])
+        cash_accounts = ("1010", "1030")
+        expense_lines = [l for l in lines if l.get("cents", 0) > 0 and l.get("acct") not in cash_accounts and l["acct"][0] in "456"]
+        
+        if expense_lines:
+            # Adjust the largest expense line
+            target_line = max(expense_lines, key=lambda l: l.get("cents", 0))
+            old_amt = target_line["cents"]
+            target_line["cents"] = new_amt
+            r.log("decide", f"Adjusted {target_line['acct']} from {fmt(old_amt)} to {fmt(new_amt)}", pause=0.5)
+            
+            # Create new work item
+            from jarvis.work.transition import create_item, transition
+            from jarvis.work.roles import actor
+            from jarvis.agent.context import SYNC
+            
+            new_it = create_item(r.wb.db, SYNC, it["kind"],
+                               f"{it['anchor']}-corrected",
+                               f"{it['title']} (corrected per Controller: {fmt(new_amt)})",
+                               it["period"], it.get("tags", []))
+            
+            jarvis = actor("jarvis")
+            transition(r.wb.db, new_it["item_id"], "propose", jarvis,
+                      {"proposal": corrected_proposal,
+                       "evidence": it.get("evidence", []),
+                       "rationale": f"Re-proposed per Controller correction: {reason[:300]}",
+                       "confidence": 0.95},
+                      reason=f"Corrected after rejection: {reason[:200]}")
+            
+            r.proposals.append(new_it["item_id"])
+            r.log("decide", f"Re-proposed as {new_it['item_id']}", pause=0.8)
+        else:
+            # Can't auto-correct, mark as NEEDS_INFO
+            r.log("decide", "Cannot determine which line to adjust - marking for clarification", pause=0.5)
     
     # Check for policy changes mentioned in rejection
     if "policy" in reason.lower() or "always" in reason.lower():

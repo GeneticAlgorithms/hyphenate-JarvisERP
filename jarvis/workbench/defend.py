@@ -242,16 +242,44 @@ def defend(run, it, question: str) -> dict:
             run.log("decide", "Precedent recorded. Re-proposing with correction...", pause=0.5)
             
             # Immediately re-propose with corrected data
-            corrected_proposal = dict(it["proposal"])
+            import copy
+            corrected_proposal = copy.deepcopy(it["proposal"])
+            lines = corrected_proposal.get("lines", [])
+            
             if "new_amount" in concession:
-                # Adjust amounts proportionally (use debits only to get the real transaction amount)
-                old_total = sum(l.get("cents", 0) for l in corrected_proposal.get("lines", []) if l.get("cents", 0) > 0)
-                scale = concession["new_amount"] / old_total if old_total > 0 else 1.0
-                for line in corrected_proposal.get("lines", []):
-                    if line.get("cents", 0) != 0:
-                        line["cents"] = int(line["cents"] * scale)
+                # Find the disputed line (largest debit that isn't the cash account)
+                cash_accounts = ("1010", "1030")
+                debit_lines = [l for l in lines if l.get("cents", 0) > 0 and l.get("acct") not in cash_accounts]
+                if debit_lines:
+                    # Adjust ONLY the largest debit line (the disputed invoice/expense)
+                    disputed_line = max(debit_lines, key=lambda l: l.get("cents", 0))
+                    old_amount = disputed_line["cents"]
+                    disputed_line["cents"] = concession["new_amount"]
+                    
+                    # Calculate the difference
+                    diff = concession["new_amount"] - old_amount
+                    
+                    # Add FX difference line to balance OR mark as NEEDS_INFO
+                    if abs(diff) > 0:
+                        # Add balancing line for the difference (6810 FX/Bank Fees)
+                        diff_line = {
+                            "acct": "6810",
+                            "cents": -diff,  # Opposite sign to balance
+                            "memo": f"Difference from corrected invoice amount"
+                        }
+                        lines.append(diff_line)
+                        run.log("decide", f"Added {fmt(abs(diff))} to 6810 Bank & FX Fees to balance the correction", pause=0.5)
             
             if "new_date" in concession:
+                # If work moved to a different period, withdraw the accrual entirely
+                new_period = concession["new_date"][:7]
+                old_period = it["period"]
+                if new_period != old_period:
+                    # Don't accrue in the old period - withdraw entirely
+                    run.log("decide", f"Work moved from {old_period} to {new_period} - withdrawing {old_period} accrual entirely", pause=0.8)
+                    points = [f"**CONCEDING**: {concession['reason']}. The work happened in {new_period}, not {old_period}, so no September accrual is needed."]
+                    points.append(f"Precedent recorded. Accrual withdrawn.")
+                    return {"points": points, "item_id": it["item_id"], "conceded": True}
                 corrected_proposal["date"] = concession["new_date"]
             
             # Create new work item with correction
@@ -260,6 +288,11 @@ def defend(run, it, question: str) -> dict:
                                f"{it['title']} (corrected per Controller)",
                                it["period"], it.get("tags", []))
             
+            # Update title to reflect correction
+            old_title = it["title"]
+            new_title = f"{old_title} (corrected: {fmt(concession['new_amount'])})"
+            run.wb.db.conn.execute("UPDATE work_items SET title = ? WHERE item_id = ?", (new_title, new_it["item_id"]))
+            
             transition(run.wb.db, new_it["item_id"], "propose", jarvis,
                       {"proposal": corrected_proposal,
                        "evidence": it.get("evidence", []),
@@ -267,9 +300,22 @@ def defend(run, it, question: str) -> dict:
                        "confidence": it.get("confidence", 0.9)},
                       reason=f"Re-proposed after concession: {concession['reason'][:200]}")
             
-            run.log("decide", f"Re-proposed as {new_it['item_id']}", pause=0.8)
+            # Add to run.proposals so it appears in the workbench UI
+            run.proposals.append(new_it["item_id"])
             
-            points = [f"**CONCEDING**: {concession['reason']}. {concession['action']}."]
+            # Log the precedent insertion to audit trail
+            from jarvis.work.transition import append_audit
+            append_audit(run.wb.db, jarvis, "record_precedent", new_it["item_id"], True,
+                        f"Precedent recorded: {concession['reason'][:200]}", {}, [prec_id])
+            
+            run.log("decide", f"Re-proposed as {new_it['item_id']} with corrected amounts", pause=0.8)
+            
+            # Verify the corrected entry balances
+            balance = sum(l.get("cents", 0) for l in corrected_proposal.get("lines", []))
+            if balance != 0:
+                run.log("warn", f"Corrected entry does not balance: off by {fmt(balance)}", pause=0.8)
+            
+            points = [f"**CONCEDING**: {concession['reason']}. Adjusted only the disputed line, kept bank payment unchanged."]
             points.append(f"Precedent recorded. Original proposal withdrawn. Corrected as {new_it['item_id']}.")
             return {"points": points, "item_id": it["item_id"], "new_item_id": new_it["item_id"], "conceded": True}
         except Exception as e:
