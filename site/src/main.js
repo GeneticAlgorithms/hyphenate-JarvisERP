@@ -97,7 +97,7 @@ const glossaryTerms = [
     name: 'Other Receivable',
     category: 'accounts',
     definition: 'Amounts owed to the company that aren\'t customer invoices (interest, employee payback, etc).',
-    example: 'Employee buys Steam game $113.44 on corp card → Other Receivable'
+    example: 'Employee buys Steam game $113.44 on corp card → 1250 Employee Receivable'
   },
   {
     name: 'Timing Difference',
@@ -748,7 +748,7 @@ function initPresentMode() {
             <div class="slide-challenge-item">
               <div class="challenge-name">Correctness</div>
               <div class="challenge-q">Is it right?</div>
-              <div class="challenge-a">Simulation harness, 92% match on real data</div>
+              <div class="challenge-a">Simulation harness with an answer key on every tab</div>
             </div>
             <div class="slide-challenge-item">
               <div class="challenge-name">Evidence</div>
