@@ -964,21 +964,31 @@ function initPresentMode() {
   };
 
   const openPresentMode = () => {
-    presentMode.classList.remove('hidden');
-    currentSlide = 0;
-    showSlide(currentSlide);
-    document.body.style.overflow = 'hidden';
-    
-    if (autoplay) {
-      startAutoplay();
+    try {
+      if (!presentMode || !slideCounter) {
+        console.error('Present mode elements not found');
+        return;
+      }
+      presentMode.classList.remove('hidden');
+      currentSlide = 0;
+      showSlide(currentSlide);
+      document.body.style.overflow = 'hidden';
+      
+      if (autoplay) {
+        startAutoplay();
+      }
+    } catch (error) {
+      console.error('Error opening present mode:', error);
     }
   };
 
-  presentBtn.addEventListener('click', openPresentMode);
+  presentBtn?.addEventListener('click', openPresentMode);
 
   // Auto-open if ?present=1
   if (autoOpenPresent) {
-    setTimeout(openPresentMode, 500);
+    console.log('Auto-opening present mode...');
+    // Wait for page to fully load before opening
+    setTimeout(openPresentMode, 1000);
   }
 
   exitBtn.addEventListener('click', () => {
