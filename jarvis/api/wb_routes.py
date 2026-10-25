@@ -114,6 +114,11 @@ def verify():
     return W().verify()
 
 
+@router.post("/api/wb/item/{item_id}/challenge")
+def challenge(item_id: str, body: dict = Body(...)):
+    return W().challenge(item_id, body.get("question") or "Why?")
+
+
 @router.post("/api/wb/item/{item_id}/{decision}")
 def decide(item_id: str, decision: str, body: dict = Body(default={})):
     w = W()

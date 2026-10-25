@@ -47,14 +47,23 @@ class Run:
         self.out_dir = OUT / self.id
         self.out_dir.mkdir(parents=True, exist_ok=True)
         self.ctx: dict = {}
+        self.moments: list[dict] = []      # the "moment" pillar: caught / recovered / asked / defended
+        self.proof: dict | None = None     # answer-key scorecard vs a naive baseline
 
     # ---------------------------------------------------------------- logging
     def _stage(self, key: str) -> dict:
         return next(s for s in self.stages if s["key"] == key)
 
-    def log(self, level: str, msg: str, data=None, evidence: list | None = None, pause: float = 1.0):
+    def moment(self, kind: str, level: str, msg: str, data=None, **kw):
+        """A log line that is also one of the run's moments (caught what others miss, recovered, asked, defended)."""
+        e = self.log(level, msg, data, moment=kind, **kw)
+        self.moments.append({"kind": kind, "seq": e["seq"], "stage": e["stage"], "msg": msg})
+        return e
+
+    def log(self, level: str, msg: str, data=None, evidence: list | None = None, pause: float = 1.0, moment: str | None = None):
         assert level in LEVELS, level
-        entry = {"seq": len(self.logs) + 1, "t": now(), "stage": self.cur, "level": level, "msg": msg, "data": data}
+        entry = {"seq": len(self.logs) + 1, "t": now(), "stage": self.cur, "level": level, "msg": msg, "data": data,
+                 "moment": moment}
         with self.wb.db.tx():
             row = append_audit(self.wb.db, JARVIS if level != "sim" else SYNC, f"{self.problem}:{self.cur}:{level}",
                                self.id, True, msg[:400], {"data": data} if data is not None else {}, evidence or [],
@@ -129,7 +138,8 @@ class Run:
         out = {"id": self.id, "problem": self.problem, "title": self.title, "status": self.status, "stages": self.stages,
                "started": self.started, "instructions": self.instructions,
                "proposals": [self._prop(i) for i in self.proposals],
-               "artifacts": [{k: v for k, v in a.items() if k != "payload"} for a in self.artifacts.values()]}
+               "artifacts": [{k: v for k, v in a.items() if k != "payload"} for a in self.artifacts.values()],
+               "moments": self.moments, "proof": self.proof, "agent": getattr(self, "agent", self.problem)}
         if full:
             out["logs"] = self.logs
         return out
@@ -169,6 +179,8 @@ class Workbench:
             events.publish("wb", run_id=run.id, problem=problem, kind="status", status="running")
             try:
                 spec["run"](run, **opts)
+                from jarvis.workbench import proof
+                proof.score(run)
                 run.status = "awaiting_approval" if any(get_item(self.db, p)["state"] == "PROPOSED" for p in run.proposals) \
                     else "done"
             except Exception as e:  # noqa
@@ -205,6 +217,15 @@ class Workbench:
                 events.publish("wb", run_id=run.id, problem=run.problem, kind="stage", stage=last)
             events.publish("wb", run_id=run.id, problem=run.problem, kind="status", status=run.status)
         return res
+
+    def challenge(self, item_id: str, question: str, who: str = "maya") -> dict:
+        """The Controller questions a proposal; the agent defends it from its own evidence (and logs every point)."""
+        from jarvis.workbench import defend
+        it = get_item(self.db, item_id)
+        run = self.runs.get(it["proposal"].get("run_id"))
+        with self.db.tx():
+            append_audit(self.db, actor(who), "challenge", item_id, True, question[:400], {}, [], publish=False)
+        return defend.defend(run, it, question)
 
     def apply(self, item_id: str, run: Run | None) -> dict:
         it = get_item(self.db, item_id)

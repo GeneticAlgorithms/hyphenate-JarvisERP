@@ -50,7 +50,7 @@ def run(r, **_):
             notes = [n for n in (dn, an, "whitespace trimmed" if desc != row[2] else "") if n]
             key = (d, a, desc, row[5])
             if key in seen:
-                r.log("find", f"bank row {i}: exact duplicate of an earlier row (same date, amount, description, running balance) — "
+                r.moment("caught", "find", f"bank row {i}: exact duplicate of an earlier row (same date, amount, description, running balance) — "
                               f"export glitch, dropped", {"row": row})
                 diff.append({"row": i, "before": ",".join(row), "after": "(dropped)", "why": "duplicate export row"})
                 continue
@@ -145,7 +145,7 @@ def run(r, **_):
                 ts_diff.append({"row": i, "before": ",".join(row), "after": "(dropped)", "why": "duplicate"})
                 continue
             if not ok:
-                r.log("decide", f"timesheet row {i}: {row[2]} {h:g} h not approved ('{row[4]}') — excluded from accrual basis")
+                r.moment("caught", "decide", f"timesheet row {i}: {row[2]} {h:g} h not approved ('{row[4]}') — excluded from accrual basis")
                 ts_diff.append({"row": i, "before": ",".join(row), "after": "(excluded)", "why": "not approved"})
                 continue
             seen.add(key)
@@ -186,7 +186,7 @@ def run(r, **_):
             if d.startswith("INTEREST PAYMENT"):
                 n = r.ctx["notice"]
                 in_gl = [g for g in r.ctx["gl"] if g["account"].startswith("4900")]
-                r.log("find", f"{b['date']} INTEREST PAYMENT {fmt(b['amount_cents'])}: notice says earned {n['period_start']}–"
+                r.moment("caught", "find", f"{b['date']} INTEREST PAYMENT {fmt(b['amount_cents'])}: notice says earned {n['period_start']}–"
                               f"{n['period_end']}; September GL 4900 has {len(in_gl)} lines and 1260 ends at $0.00 → "
                               f"September revenue is missing from September books")
                 found.append({"bank_line": f"{b['date']} {d}", "amount_cents": b["amount_cents"], "earned": "2026-09",
@@ -224,10 +224,10 @@ def run(r, **_):
             r.log("decide", "Nadia Kroll: booking for 9/25 + run of show confirms she performed → accrue (performance evidence, not just a contract)")
             cands.append({"vendor": "Nadia Kroll", "evidence": "booking + run of show", "decision": "accrue"})
         inv = docs["BR-20871 BayRig.txt"]
-        r.log("decide", "Bay Rig Rentals: invoice BR-20871 is dated 10/03 but the service period is Sept 20–27 → September expense; "
+        r.moment("caught", "decide", "Bay Rig Rentals: invoice BR-20871 is dated 10/03 but the service period is Sept 20–27 → September expense; "
                         "not in the September GL → accrue")
         cands.append({"vendor": "Bay Rig Rentals", "evidence": "invoice (service in Sept)", "decision": "accrue"})
-        r.log("decide", "Strobe & Co: signed SOW, but the event is October 10 → a commitment, not September work → no accrual")
+        r.moment("caught", "decide", "Strobe & Co: signed SOW, but the event is October 10 → a commitment, not September work → no accrual")
         cands.append({"vendor": "Strobe & Co", "evidence": "SOW for Oct 10", "decision": "skip — future service"})
         r.artifact("table", "Accrual candidates", {"columns": ["vendor", "evidence", "decision"], "rows": cands})
         r.count(accrue=3, skipped=1)
@@ -238,7 +238,7 @@ def run(r, **_):
         rate, h = r.ctx["rate"], r.ctx["hours"]
         lumen = int(rate * h)
         r.log("decide", f"Lumen: method (b) contract rate × approved hours = {fmt(rate)} × {h:g} = {fmt(lumen)}")
-        r.log("find", "Sources disagree: vendor email (9/29) says 'around 10k' vs contract × timesheet "
+        r.moment("caught", "find", "Sources disagree: vendor email (9/29) says 'around 10k' vs contract × timesheet "
                       f"{fmt(lumen)}. Ranking: invoice > rate × approved hours > flat fee w/ performance > informal estimate → "
                       f"keep {fmt(lumen)}")
         lum_hist = [x for x in r.ctx["hist"] if x["vendor"] == "Lumen Crew LLC"]
@@ -251,7 +251,7 @@ def run(r, **_):
         r.ctx["lumen_hist_avg"] = avg
         nad = [x for x in r.ctx["hist"] if x["vendor"] == "Nadia Kroll"]
         r.log("decide", "Nadia: method (c) flat fee $2,500.00 (booking) with performance evidence (run of show)")
-        r.log("warn", f"Nadia history: July accrual corrected by the Controller to $2,250 ('{nad[0]['notes']}'); Feb invoice 47 days late → "
+        r.moment("caught", "warn", f"Nadia history: July accrual corrected by the Controller to $2,250 ('{nad[0]['notes']}'); Feb invoice 47 days late → "
                       f"confirm amount with her and escalate")
         r.log("decide", "Bay Rig: method (a) vendor invoice $3,600.00 — strongest evidence")
         r.artifact("table", "Measurement", {"columns": ["vendor", "method", "amount", "contradicting source", "note"], "rows": [
@@ -276,7 +276,7 @@ def run(r, **_):
         r.ctx["lumen_total"] = r.ctx["lumen"] + premium
         r.log("sim", "→ email to hello@nadiakroll.studio: 'Can you confirm your fee for Fox Theater 9/25 and send the invoice?'", pause=1.0)
         r.log("sim", "… no reply after 48h (simulated clock) — second reminder sent", pause=1.0)
-        r.log("ask", "Nadia hasn't answered. Booking $2,500 accrued at the contract amount and escalated to the Controller "
+        r.moment("asked", "ask", "Nadia hasn't answered. Booking $2,500 accrued at the contract amount and escalated to the Controller "
                      "(she corrected Nadia's accrual once before).")
         r.flag("Lumen confirmed (+$670 premium); Nadia silent → escalated")
 
@@ -335,7 +335,7 @@ def run(r, **_):
 def on_reject(r, it, reason):
     amt = C.money(re.search(r"\$\s?([\d,]+(?:\.\d{2})?)", reason).group(0))[0] if re.search(r"\$\s?[\d,]+", reason) else None
     if amt and "Nadia" in it["title"]:
-        r.log("decide", f"Controller says {fmt(amt)}. Re-planning Nadia's accrual at the confirmed amount; the correction becomes "
+        r.moment("recovered", "decide", f"Controller says {fmt(amt)}. Re-planning Nadia's accrual at the confirmed amount; the correction becomes "
                         f"precedent #3 for 'accrue the amount the vendor confirmed' → proposing that as a standing policy.")
         r.propose("accrual", "Accrue Nadia Kroll VJ — Fox Theater 9/25 (confirmed amount)",
                   {"date": PERIOD_END, "memo": "Nadia Kroll (confirmed)", "auto_reverse": "2026-10-01",

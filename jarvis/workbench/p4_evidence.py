@@ -87,11 +87,11 @@ def run(r, **_):
                 continue
             h = C.sha(p)
             if h in seen:
-                r.log("find", f"'{d['file']}' is byte-identical to '{seen[h]}' (sha256 {h[:10]}) → duplicate download, not filed twice")
+                r.moment("caught", "find", f"'{d['file']}' is byte-identical to '{seen[h]}' (sha256 {h[:10]}) → duplicate download, not filed twice")
                 continue
             seen[h] = d["file"]
             if d["period"] != PERIOD:
-                r.log("find", f"'{d['file']}' is {d['account']} for {d['period']}, not {PERIOD} → wrong period; it already belongs in "
+                r.moment("caught", "find", f"'{d['file']}' is {d['account']} for {d['period']}, not {PERIOD} → wrong period; it already belongs in "
                               f"the {d['period']} folder, so it can't count as September evidence")
                 continue
             keep.append((d, p))
@@ -109,7 +109,7 @@ def run(r, **_):
                     r.log("check" if ok else "fail", f"{d['account']}: recon statement ending balance {fmt(d['balance'])} vs bank statement "
                                                      f"{fmt(s['balance'])} {'✓ ties' if ok else '✗ does not tie'}")
                 else:
-                    r.log("warn", f"{d['account']} recon has no matching statement")
+                    r.moment("caught", "warn", f"{d['account']} recon has no matching statement")
         r.done("recons tie to their statements")
 
     with r.stage("plan", "learn the convention from last month's Drive folder"):
@@ -146,7 +146,7 @@ def run(r, **_):
                     why = ("only an AUGUST recon was downloaded ('Reconciliation (1).pdf')" if a["Last4"] == "0091"
                            else "nothing downloaded for this account")
                     exceptions.append({"account": a["Account"], "missing": need, "why": why})
-                    r.log("find", f"{a['Account']}: {need} MISSING — {why}")
+                    r.moment("caught", "find", f"{a['Account']}: {need} MISSING — {why}")
         r.artifact("table", "Evidence manifest", {"columns": ["account", "document", "status"], "rows": rows})
         r.artifact("table", "Exceptions", {"columns": ["account", "missing", "why"], "rows": exceptions})
         r.ctx["exceptions"] = exceptions
@@ -157,7 +157,7 @@ def run(r, **_):
                   f"Contents-verified, deduplicated, period-checked; recons tie to statements. {len(r.ctx['exceptions'])} exceptions "
                   f"stay open.", [], 0.95)
         for e in r.ctx["exceptions"]:
-            r.log("ask", f"request: {e['account']} {e['missing']} for {PERIOD} — assign to Dev Patel (owner of {e['account']} rec)")
+            r.moment("asked", "ask", f"request: {e['account']} {e['missing']} for {PERIOD} — assign to Dev Patel (owner of {e['account']} rec)")
         r._stage("approve")["status"] = "waiting"
         r._stage("approve")["summary"] = "filing plan waiting; exceptions assigned"
 

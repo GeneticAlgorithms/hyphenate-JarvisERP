@@ -130,7 +130,7 @@ def run(r, **_):
                             + ", ".join(f"'{o['name']}' becomes an alias" for o in others))
         for a, b, v in r.ctx["verdicts"]:
             if v == "different entities":
-                r.log("decide", f"KEEP SEPARATE: '{a['name']}' and '{b['name']}' look alike but are different legal entities — "
+                r.moment("caught", "decide", f"KEEP SEPARATE: '{a['name']}' and '{b['name']}' look alike but are different legal entities — "
                                 f"merging would mix two suppliers' history and 1099s")
         r.ctx["clusters"] = clusters
         r.done(f"{len(clusters)} merges, 1 look-alike kept separate")
@@ -151,7 +151,7 @@ def run(r, **_):
                          "spend_after": fmt(total)})
             dup = [t for t in txs if t["Memo"] == "Cursor Business Sept"]
             if len(dup) == 2:
-                r.log("find", "side finding: 'Cursor Business Sept' $480 exists as both a QBO bill (Anysphere) and a Ramp charge (Cursor) "
+                r.moment("caught", "find", "side finding: 'Cursor Business Sept' $480 exists as both a QBO bill (Anysphere) and a Ramp charge (Cursor) "
                               "— with one vendor this duplicate becomes visible → flagged to AP (void the bill)")
         r.artifact("table", "Impact", {"columns": ["vendor", "aliases", "transactions", "spend_before", "spend_after"], "rows": rows})
         r.done("spend consolidated; categories preserved; hidden duplicate bill surfaced")

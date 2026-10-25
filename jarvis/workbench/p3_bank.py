@@ -65,7 +65,7 @@ def run(r, **_):
                 r.log("decide", f"line {f['line']} {f['description'][:38]}: QBO already found the synced entry ({f['qbo_suggestion']}) — accept match")
             elif f["processor"]:
                 vague.append(f)
-                r.log("find", f"line {f['line']} '{f['description'][:44]}' {fmt(f['amount_cents'])}: descriptor names the "
+                r.moment("caught", "find", f"line {f['line']} '{f['description'][:44]}' {fmt(f['amount_cents'])}: descriptor names the "
                               f"{f['processor']} rail, not the merchant/purpose — QBO guessed '{f['qbo_suggestion']}' → needs lookup")
             else:
                 r.log("decide", f"line {f['line']} {f['description'][:38]}: self-explanatory ('{f['qbo_suggestion']}') — accept")
@@ -126,12 +126,12 @@ def run(r, **_):
                 if best:
                     break
             if not best:
-                r.log("decide", f"no payment combination equals {fmt(target)} → this is a top-up of our PayPal balance "
+                r.moment("caught", "decide", f"no payment combination equals {fmt(target)} → this is a top-up of our PayPal balance "
                                 f"(transfer 1010 → 1030), not an expense")
                 f["lines"] = [{"acct": "1030", "cents": target, "memo": "Top-up PayPal balance"}]
                 continue
             used |= {p["id"] for p in best}
-            r.log("find", f"{len(best)} payments sum to {fmt(target)} to the cent: " + ", ".join(
+            r.moment("caught", "find", f"{len(best)} payments sum to {fmt(target)} to the cent: " + ", ".join(
                 f"{p['name']} {fmt(-p['gross'], p['currency'])}" for p in best))
             f["payments"] = [(p, usd(p)) for p in best]
         r.done("PayPal transfers decomposed; top-up recognized")
@@ -154,7 +154,7 @@ def run(r, **_):
                         lines += [{"acct": acct, "cents": mkt, "memo": f"{p['name']} {p['item']} (€{-p['gross'] / 100:,.2f} @ ECB {rate})"},
                                   {"acct": "6810", "cents": usd - mkt, "memo": "PayPal FX spread"}]
                     elif "steam" in p["item"].lower() or "Valve" in p["name"]:
-                        r.log("decide", f"{p['name']} {fmt(usd)} paid from j.ortiz@ login, digital games → ruling P-0317 → "
+                        r.moment("caught", "decide", f"{p['name']} {fmt(usd)} paid from j.ortiz@ login, digital games → ruling P-0317 → "
                                         f"1250 Employee Receivable; notify J. Ortiz")
                         lines.append({"acct": "1250", "cents": usd, "memo": "Personal - Steam - J. Ortiz"})
                     else:
@@ -172,7 +172,7 @@ def run(r, **_):
                 lines = [{"acct": "6900", "cents": 11297, "memo": "Amazon - toner, notebooks"},
                          {"acct": "5030", "cents": 10140, "memo": "Amazon - Elgato Stream Deck (net of rebate)"}]
             elif f["processor"] == "Zelle":
-                r.log("ask", "Zelle to 'R Lopez' $350.00: only a run sheet mentions a stagehand 'R. Lopez'. That's a hint, not support → "
+                r.moment("asked", "ask", "Zelle to 'R Lopez' $350.00: only a run sheet mentions a stagehand 'R. Lopez'. That's a hint, not support → "
                              "ask the Controller instead of guessing an account")
                 f["question"] = ("Zelle $350.00 to 'R Lopez' on 9/28 — the Oakland run sheet lists a stagehand R. Lopez. Is this "
                                  "crew cost for the Fox Theater show? (No invoice or W-9 on file.)")

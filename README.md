@@ -18,10 +18,17 @@ Each tab is one problem our accountant teammate described, in her words. Each ha
 | **04 Evidence & Folders** | ~/Downloads: `Statement (3).pdf`, an identical `(1)` copy, last month's statement, recon reports, an unrelated budget PDF | Read each PDF's contents, classify it (statement or recon, account, last 4, period), dedupe by hash, drop the wrong period, cross-check recon to statement balance, learn the naming convention from August's Drive tree, check completeness | Filing plan into Drive with proper names, plus a manifest. 3 missing items flagged with the reason |
 | **05 Duplicate Vendors** | QBO vendor list (Anthropic / `ANTHROPIC PBC ` / Claude, Anysphere / Cursor, Google / Google Ads / Google Workspace, AWS, Splice.com, Lumen Crew vs Lumen Studios); Ramp suggested vendors; W-9 registry; transactions | Normalize, block, score evidence (TIN, domain, receipt issuer, W-9, product name), merge real duplicates, **keep look-alikes separate** (different TIN), show the spend impact, write prevention rules | 5 merges + Ramp→QBO mapping rules |
 
+Every tab answers the four judging questions live, in the strip at the top right:
+- **01 Is it real enough?** Each run is scored against an answer key, next to the naive baseline: cash-basis bank rules, QBO's suggested category, dragging files into a folder, or name-match dedupe. Jarvis gets 6/6, 5/5, 9/9, 6/6, 8/8 and 7/7 (late change); the baselines get 1/6, 0/5, 3/9, 0/6, 4/8 and 0/7.
+- **02 Would you hire it?** The seat, what it can read, what it can write (nothing directly), when it asks, and its record: log lines, asks and denied attempts.
+- **03 Something new?** The approach that tab demonstrates.
+- **04 The moment.** Every log line where it *caught* what others missed, *recovered* (late QBO change, silent vendor, a rejection), *asked*, or *defended* a decision. Click one to jump to it in the log.
+
 Things to try in the demo:
 - Click any raw file to see the mess, with every cell a human would have to fix highlighted.
 - Click a pipeline stage to filter the log to that stage.
 - Expand a log line to see the data the agent acted on.
+- Press **Challenge** on a proposal (e.g. *"Why not just expense it all like we always do with PayPal? It's under materiality."*). The agent defends from its own logged evidence, citing log lines and audit hashes, says what the alternative would cost and what would change its mind. Defending never approves anything.
 - Press **"agent self-approve?"** on any proposal. It is denied in code, the denial is logged, and nothing changes.
 - Open **Audit trail** and click *Verify chain* to re-hash every row.
 

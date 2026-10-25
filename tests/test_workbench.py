@@ -72,3 +72,22 @@ def test_package_formulas_and_late_change_supersedes_v1(wb):
     assert get_item(wb.db, v1.proposals[0])["state"] == "DISMISSED"
     assert get_item(wb.db, v2.proposals[0])["state"] == "PROPOSED"
     assert wb.verify()["ok"]
+
+
+@pytest.mark.parametrize("agent", ["p1_timing", "p2_rollforward", "p3_bank", "p4_evidence", "p5_vendors", "p2_late"])
+def test_every_run_is_scored_against_the_answer_key_and_beats_the_baseline(wb, agent):
+    r = next((x for x in wb.runs.values() if x.agent == agent), None) or run(wb, agent)
+    assert r.proof and r.proof["jarvis"] == r.proof["total"], [x for x in r.proof["rows"] if not x["jarvis_pass"]]
+    assert r.proof["baseline"] < r.proof["total"]
+    assert r.moments, "every run has at least one moment (caught / recovered / asked)"
+
+
+def test_agent_defends_a_challenged_decision_from_logged_evidence(wb):
+    r = next(x for x in wb.runs.values() if x.agent == "p3_bank")
+    item = next(p for p in r.proposals if "DCE4343478" in get_item(wb.db, p)["title"])
+    res = wb.challenge(item, "Why not just expense it all like we always do with PayPal? It's under materiality.")
+    text = " ".join(res["points"])
+    assert "P-0317" in text and "Prepaid" in text and "Log #" in text
+    assert any(e.get("moment") == "defended" for e in r.logs)
+    assert get_item(wb.db, item)["state"] == "PROPOSED", "defending does not approve anything"
+    assert wb.verify()["ok"]

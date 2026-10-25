@@ -87,7 +87,7 @@ def run(r, late: bool = False, **_):
         if late:
             for k in ("PL", "BS", "CF"):
                 old = next(raw.glob({"PL": "ProfitAndLoss*.xlsx", "BS": "BalanceSheet*.xlsx", "CF": "Statement of Cash Flows*.xlsx"}[k]))
-                r.log("find", f"{k}: new export '{files[k].name}' hash {C.sha(files[k])[:10]} ≠ previous '{old.name}' {C.sha(old)[:10]} "
+                r.moment("recovered", "find", f"{k}: new export '{files[k].name}' hash {C.sha(files[k])[:10]} ≠ previous '{old.name}' {C.sha(old)[:10]} "
                               f"→ content changed after the package was built")
             note = (base / "late_change" / "README_late_change.txt").read_text().strip()
             r.log("info", f"change note: {note}")
@@ -134,11 +134,11 @@ def run(r, late: bool = False, **_):
         changes = []
         for num, a in r.ctx["parsed"]["PL"]["accts"].items():
             if num not in pkg_is:
-                r.log("find", f"new GL account {num} '{a['name']}' ({fmt(a['cents'])}) is not in the package → insert a new row "
+                r.moment("caught", "find", f"new GL account {num} '{a['name']}' ({fmt(a['cents'])}) is not in the package → insert a new row "
                               f"under '{a['section']}' in account-number order, label from QBO, prior months = 0")
                 changes.append({"account": num, "change": "NEW row inserted", "detail": f"{a['name']} under {a['section']}"})
             elif pkg_is[num][1] != a["name"]:
-                r.log("find", f"account {num} renamed in QBO: '{pkg_is[num][1]}' → '{a['name']}' — matched by number, label "
+                r.moment("caught", "find", f"account {num} renamed in QBO: '{pkg_is[num][1]}' → '{a['name']}' — matched by number, label "
                               f"updated (a name-based lookup would have dropped this row to zero)")
                 changes.append({"account": num, "change": "label updated", "detail": f"{pkg_is[num][1]} → {a['name']}"})
         missing = [n for n in pkg_is if n not in r.ctx["parsed"]["PL"]["accts"]]
@@ -210,7 +210,7 @@ def run(r, late: bool = False, **_):
                     if other is not r and it["kind"] == "package_publish" and it["state"] == "PROPOSED":
                         transition(r.wb.db, pid, "withdraw", JARVIS,
                                    reason=f"Superseded by {r.id}: QBO changed after v1 was built (AJE-0930-04)")
-                        r.log("decide", f"Withdrew stale sign-off request {pid} ({it['title']}) — superseded by v2; "
+                        r.moment("recovered", "decide", f"Withdrew stale sign-off request {pid} ({it['title']}) — superseded by v2; "
                                         f"Maya only signs the current numbers", {"item_id": pid, "superseded_by": r.id})
                         if not any(get_item(r.wb.db, q)["state"] == "PROPOSED" for q in other.proposals):
                             other.status = "superseded"
