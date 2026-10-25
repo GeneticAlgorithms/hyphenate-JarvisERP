@@ -226,6 +226,16 @@ function initScrollAnimations() {
     }
   });
 
+  // Challenge section reveal
+  gsap.to('.challenge-section', {
+    opacity: 1,
+    duration: 0.6,
+    scrollTrigger: {
+      trigger: '.challenge-section',
+      start: 'top 75%',
+    }
+  });
+
   // Moment stack - Reveal and fan out stacked cards
   const momentCards = ['#momentCard1', '#momentCard2', '#momentCard3', '#momentCard4'];
   momentCards.forEach((cardId, index) => {
@@ -571,34 +581,139 @@ function initPresentMode() {
   const nextBtn = document.getElementById('nextSlide');
   const slideCounter = document.getElementById('slideCounter');
 
-  const sections = Array.from(document.querySelectorAll('.section'));
   let currentSlide = 0;
   let autoplayInterval = null;
   
-  // Check for autoplay parameter
+  // Check for URL parameters
   const urlParams = new URLSearchParams(window.location.search);
+  const autoOpenPresent = urlParams.get('present') === '1';
   const autoplay = urlParams.get('autoplay') === '1';
   const duration = parseInt(urlParams.get('dur') || '8') * 1000;
 
+  // Define purpose-built slides with 16:9 layouts
+  const slides = [
+    {
+      title: 'JarvisERP',
+      render: () => `
+        <div class="present-slide-hero">
+          <div class="present-eyebrow">Cal Hacks 2026 · Hyphenate Track</div>
+          <h1 class="present-title">An autonomous Staff Accountant<br>you could actually hire</h1>
+          <p class="present-subtitle">JarvisERP fills Afterglow Labs' Staff Accountant and Vendor-Master seats.<br>
+          It reconciles three systems that never agree, books accruals, keeps vendors deduplicated—<br>
+          and cannot pass anything to humans without Controller hash-approval.</p>
+        </div>
+      `
+    },
+    {
+      title: 'The Moment',
+      render: () => {
+        const moment = document.querySelector('#moment .moment-content');
+        return moment ? moment.innerHTML : '<p>Moment content</p>';
+      }
+    },
+    {
+      title: 'Afterglow Labs',
+      render: () => {
+        const company = document.querySelector('#company .company-content');
+        return company ? company.innerHTML : '<p>Company content</p>';
+      }
+    },
+    {
+      title: 'Three Systems',
+      render: () => {
+        const systems = document.querySelector('#systems .systems-content');
+        return systems ? systems.innerHTML : '<p>Systems content</p>';
+      }
+    },
+    {
+      title: 'Five Problems',
+      render: () => {
+        const problems = document.querySelector('#problems .problems-grid');
+        return problems ? `<div class="present-problems-grid">${problems.innerHTML}</div>` : '<p>Problems</p>';
+      }
+    },
+    {
+      title: 'Challenges',
+      render: () => {
+        const challenges = document.querySelector('#challenges .challenges-content');
+        return challenges ? challenges.innerHTML : '<p>Challenges</p>';
+      }
+    },
+    {
+      title: 'Architecture',
+      render: () => {
+        const arch = document.querySelector('#architecture .iso-stack');
+        return arch ? `<div style="transform: scale(0.85);">${arch.outerHTML}</div>` : '<p>Architecture</p>';
+      }
+    },
+    {
+      title: 'Double Entry',
+      render: () => {
+        const balance = document.querySelector('#balance .balance-content');
+        return balance ? balance.innerHTML : '<p>Balance</p>';
+      }
+    },
+    {
+      title: 'Trust & Limits',
+      render: () => {
+        const trust = document.querySelector('#trust .trust-content');
+        return trust ? trust.innerHTML : '<p>Trust</p>';
+      }
+    },
+    {
+      title: 'Proof',
+      render: () => {
+        const proof = document.querySelector('#proof .proof-content');
+        return proof ? proof.innerHTML : '<p>Proof</p>';
+      }
+    },
+    {
+      title: 'Glossary',
+      render: () => `
+        <div class="present-glossary">
+          <h2>30+ Accounting Terms</h2>
+          <p>Interactive flip cards covering fundamentals, systems, accounts, timing, and processes.</p>
+          <div class="glossary-sample">
+            <div class="sample-grid">
+              <div class="sample-term"><strong>Debit</strong> — Left side of entry</div>
+              <div class="sample-term"><strong>Credit</strong> — Right side of entry</div>
+              <div class="sample-term"><strong>Accrual</strong> — Record when earned</div>
+              <div class="sample-term"><strong>Prepaid</strong> — Future benefit asset</div>
+              <div class="sample-term"><strong>Journal Entry</strong> — Balanced transaction</div>
+              <div class="sample-term"><strong>Reconcile</strong> — Prove sources agree</div>
+            </div>
+          </div>
+        </div>
+      `
+    }
+  ];
+
   const updateSlideCounter = () => {
-    slideCounter.textContent = `${currentSlide + 1} / ${sections.length}`;
+    slideCounter.textContent = `${currentSlide + 1} / ${slides.length}`;
     prevBtn.disabled = currentSlide === 0;
-    nextBtn.disabled = currentSlide === sections.length - 1;
+    nextBtn.disabled = currentSlide === slides.length - 1;
   };
 
   const showSlide = (index) => {
     const slideContainer = document.querySelector('.present-slide');
-    const section = sections[index];
+    const slide = slides[index];
     
-    // Clone the section content
-    slideContainer.innerHTML = section.innerHTML;
+    // Render the slide
+    slideContainer.innerHTML = slide.render();
     
-    // Re-run animations for the slide
+    // Animate elements in
+    const elements = slideContainer.querySelectorAll('*');
+    elements.forEach(el => {
+      el.style.opacity = '1';
+      el.style.transform = 'none';
+    });
+    
     gsap.from(slideContainer.children, {
       opacity: 0,
-      y: 30,
-      duration: 0.6,
-      stagger: 0.1
+      y: 20,
+      duration: 0.5,
+      stagger: 0.08,
+      ease: 'power2.out'
     });
     
     updateSlideCounter();
@@ -608,7 +723,7 @@ function initPresentMode() {
     if (autoplayInterval) clearInterval(autoplayInterval);
     
     autoplayInterval = setInterval(() => {
-      if (currentSlide < sections.length - 1) {
+      if (currentSlide < slides.length - 1) {
         currentSlide++;
         showSlide(currentSlide);
       } else {
@@ -624,7 +739,7 @@ function initPresentMode() {
     }
   };
 
-  presentBtn.addEventListener('click', () => {
+  const openPresentMode = () => {
     presentMode.classList.remove('hidden');
     currentSlide = 0;
     showSlide(currentSlide);
@@ -633,7 +748,14 @@ function initPresentMode() {
     if (autoplay) {
       startAutoplay();
     }
-  });
+  };
+
+  presentBtn.addEventListener('click', openPresentMode);
+
+  // Auto-open if ?present=1
+  if (autoOpenPresent) {
+    setTimeout(openPresentMode, 500);
+  }
 
   exitBtn.addEventListener('click', () => {
     presentMode.classList.add('hidden');
@@ -650,7 +772,7 @@ function initPresentMode() {
   });
 
   nextBtn.addEventListener('click', () => {
-    if (currentSlide < sections.length - 1) {
+    if (currentSlide < slides.length - 1) {
       currentSlide++;
       showSlide(currentSlide);
       if (autoplay) startAutoplay();
@@ -673,7 +795,7 @@ function initPresentMode() {
       }
     } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
       e.preventDefault();
-      if (currentSlide < sections.length - 1) {
+      if (currentSlide < slides.length - 1) {
         currentSlide++;
         showSlide(currentSlide);
         if (autoplay) startAutoplay();
