@@ -27,13 +27,26 @@ def _keywords(it):
 
 def _evidence(run, it, n=4):
     kws = [k.lower() for k in _keywords(it)]
+    # Scope evidence to this item: extract amounts, accounts, vendors from proposal
+    pr = it.get("proposal") or {}
+    lines = pr.get("lines") or []
+    item_amounts = {abs(l.get("cents", 0)) for l in lines if l.get("cents")}
+    item_accounts = {l.get("acct") for l in lines if l.get("acct")}
+    
     hits = []
     for e in run.logs:
         if e["level"] not in ("find", "decide", "check", "sim", "warn") or e.get("moment") == "defended" \
                 or e["msg"].startswith(("Proposed", "Challenge", "①", "②", "③")):
             continue
         m = e["msg"].lower()
-        score = sum(1 for k in kws if k in m) + (1 if e.get("moment") else 0)
+        # Keyword match
+        kw_score = sum(1 for k in kws if k in m)
+        # Amount match (if log mentions same dollar amount)
+        amt_score = sum(1 for amt in item_amounts if f"{amt/100:.2f}" in m or f"${amt//100}" in m)
+        # Account match
+        acct_score = sum(1 for acct in item_accounts if acct in m)
+        
+        score = kw_score + amt_score * 2 + acct_score * 2 + (1 if e.get("moment") else 0)
         if score:
             hits.append((score, e))
     hits.sort(key=lambda x: (-x[0], x[1]["seq"]))
