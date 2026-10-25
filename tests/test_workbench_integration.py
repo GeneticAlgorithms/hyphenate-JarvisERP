@@ -20,7 +20,7 @@ TABS = [
 class TestWorkbenchRun:
     """Test /api/wb/run for each tab."""
     
-    @pytest.fixture(scope="class", autoresource=True)
+    @pytest.fixture(scope="class", autouse=True)
     def server_running(self):
         """Verify server is up before running tests."""
         try:
