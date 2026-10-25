@@ -217,10 +217,20 @@ def parse(text: str) -> tuple[str, dict]:
                 # LLM extraction succeeded
                 params["_parser"] = "llm_success"
                 
+                # Normalize amounts: LLM may return integer dollars, convert to float to avoid to_cents treating as cents
+                if llm_result.get("amount") and isinstance(llm_result["amount"], int):
+                    llm_result["amount"] = float(llm_result["amount"])
+                if llm_result.get("amounts") and isinstance(llm_result["amounts"], list):
+                    llm_result["amounts"] = [float(a) if isinstance(a, int) else a for a in llm_result["amounts"]]
+                
                 # Validate and fuzzy-match vendor
                 if llm_result.get("vendor"):
                     matched = _match_vendor(llm_result["vendor"])
                     llm_result["vendor"] = matched["qbo_name"] if matched else llm_result["vendor"]
+                
+                # Map vendor → merchant for refund scenarios (LLM fills 'vendor' but template needs 'merchant')
+                if llm_result.get("template") == "refund_as_revenue" and llm_result.get("vendor") and not llm_result.get("merchant"):
+                    llm_result["merchant"] = llm_result["vendor"]
                 
                 # Merge LLM results, excluding template
                 params.update({k: v for k, v in llm_result.items() if v is not None and k != "template"})
@@ -235,7 +245,11 @@ def parse(text: str) -> tuple[str, dict]:
     
     # Deterministic parsing fallback
     if params.get("_parser") == "deterministic":
-        params["_parser"] = "deterministic_only"  # No LLM available
+        # Check if LLM was available but returned nothing useful
+        if llm.available():
+            params["_parser"] = "llm_failed"  # Was available but didn't work
+        else:
+            params["_parser"] = "deterministic_only"  # No LLM available
     
     # Extract amount
     amount = _parse_amount(text)
@@ -296,6 +310,23 @@ def parse(text: str) -> tuple[str, dict]:
                     else:
                         params["merchant"] = name
                         params["vendor"] = name
+        
+        # Final fallback: Try n-grams of the text against vendor master (catches "Lumen Crew", "Notion", etc.)
+        if "vendor" not in params and "merchant" not in params:
+            words = text.split()
+            # Try 3-word, 2-word, and 1-word n-grams
+            for n in [3, 2, 1]:
+                if n > len(words):
+                    continue
+                for i in range(len(words) - n + 1):
+                    ngram = " ".join(words[i:i+n])
+                    matched = _match_vendor(ngram)
+                    if matched:
+                        params["vendor"] = matched["qbo_name"]
+                        params["merchant"] = matched["qbo_name"]
+                        break
+                if "vendor" in params:
+                    break
     
     # Extract cardholder
     cardholder = _match_cardholder(text)
@@ -303,9 +334,9 @@ def parse(text: str) -> tuple[str, dict]:
         params["cardholder"] = cardholder
     
     # Classify (be conservative - use needs_info if unclear)
-    # Check for described bank line first (e.g. "$742.18 SQ *MOONLIGHT GEAR 9/29" or "debit 'ACME SUPPLY'")
-    has_bank_descriptor = bool(re.search(r'\$[\d,]+\.\d{2}\s+[A-Z*]+\s+', text)) or \
-                         ("debit" in t_lower and (quoted or params.get("merchant")))
+    # Check for described bank line (e.g. "$742.18 SQ *MOONLIGHT GEAR 9/29" or "debit...from SQ *MOONLIGHT")
+    has_bank_descriptor = bool(re.search(r'\$[\d,]+\.?\d{0,2}\s+[A-Z*]+\s+', text)) or \
+                         ("debit" in t_lower and ("from" in t_lower or quoted or params.get("merchant")))
     
     # Vendor bank change - broader pattern matching
     if (any(w in t_lower for w in ["bank details", "bank account", "bank acct", "banking"]) or 
@@ -345,9 +376,14 @@ def parse(text: str) -> tuple[str, dict]:
         k = "unknown_debit"
         if not params.get("description"):
             # Extract the descriptor portion - try bank line format first
-            m = re.search(r'\$[\d,]+\.\d{2}\s+([A-Z*][A-Z0-9*\s]+)', text)
+            m = re.search(r'\$[\d,]+\.?\d{0,2}\s+([A-Z*][A-Z0-9*\s]+)', text)
             if m:
                 params["description"] = m.group(1).strip()
+            # Try "from X" pattern for bank descriptors
+            elif "from" in t_lower:
+                m = re.search(r'\bfrom\s+([A-Z*][A-Z0-9*\s]+?)(?:\s+\d|$)', text)
+                if m:
+                    params["description"] = m.group(1).strip()
             # Try quoted merchant as description
             elif params.get("merchant"):
                 params["description"] = params["merchant"]
@@ -408,11 +444,16 @@ def _match_vendor(name: str) -> dict | None:
         if significant_tokens and significant_tokens.issubset(vendor_tokens):
             return v
     
-    # Fourth pass: prefix matching (e.g. "lumen" matches "Lumen Crew LLC")
+    # Fourth pass: prefix matching with distinctive token requirement
+    # Require longer match or distinctive token to avoid false positives like "Crew" → "Damlicht Crew B.V."
+    common_words = {"crew", "inc", "llc", "corp", "co", "ltd", "gmbh", "b.v.", "company", "group", "solutions", "services"}
     for v in bible.VENDORS:
         vendor_lower = v["qbo_name"].lower()
-        if any(vendor_lower.startswith(tok) or tok in vendor_lower for tok in name_tokens if len(tok) >= 4):
-            return v
+        vendor_tokens = set(vendor_lower.split())
+        for tok in name_tokens:
+            if len(tok) >= 5 and tok not in common_words:  # Distinctive token
+                if any(vt.startswith(tok) or tok in vt for vt in vendor_tokens):
+                    return v
     
     return None
 
@@ -474,22 +515,23 @@ def inject(session, text: str | None = None, template: str | None = None, params
                 append_audit(db, SYNC, "inject", "scenario:unknown", False,
                             f"Unknown template: {template}")
             events.publish("inject_error", error="unknown_template", template=template, text=text)
-            return {"error": "unknown_template", "template": template, "text": text, "items": []}
+            # Return error with http_status hint for API layer
+            return {"error": "unknown_template", "template": template, "text": text, "items": [], "http_status": 400}
         
         # CRITICAL: For free text, NEVER merge template defaults - only use parsed values
         # For explicit template calls, merge defaults as expected
         if from_free_text:
             # Validate required fields from parsed params
             required_fields = {
-                "vendor_bank_change": ["vendor", "amount"],
+                "vendor_bank_change": ["vendor", "amount", "date"],
                 "split_purchases": ["amounts"],
                 "ghost_vendor": ["vendor", "amount"],
                 "refund_as_revenue": ["merchant", "amount"],
-                "personal_card": ["merchant", "amount"],
-                "duplicate_bill": ["vendor", "amount"],
+                "personal_card": ["merchant", "amount", "date"],
+                "duplicate_bill": ["vendor", "amount", "date"],
                 "invoice_over_accrual": ["vendor", "amount"],
                 "paypal_bundle": ["payments"],
-                "unknown_debit": ["amount", "description"]
+                "unknown_debit": ["amount", "description", "date"]
             }
             
             missing = []
@@ -512,9 +554,8 @@ def inject(session, text: str | None = None, template: str | None = None, params
                         "items": [{"item_id": it["item_id"], "state": it["state"], "kind": it["kind"],
                                   "title": it["title"], "rationale": rationale, "parser": params.get("_parser", "deterministic")}]}
             
-            # Fill in reasonable defaults for optional fields
-            if template == "unknown_debit" and "date" not in params:
-                params["date"] = "2026-09-29"  # Default to end of Sep
+            # Fill in reasonable defaults for optional fields ONLY when absolutely necessary
+            # For unknown_debit, date is not strictly required - the bank line might not have one
         else:
             # Explicit template call - merge defaults
             params = {**TEMPLATES[template]["params"], **(params or {})}
@@ -629,27 +670,20 @@ def inject(session, text: str | None = None, template: str | None = None, params
                                 (bill_id, v["id"], v["qbo_name"], "2026-10-09", "2026-11-08", cents, f"INJ-{tag}",
                                  f"{v['qbo_name']} services 2026-09", v["default_acct"], "Open", "2026-09", bje))
         
-        # ALWAYS create work item even if bill exists
-        before = {r["item_id"] for r in db.q("SELECT item_id FROM work_items")}
-        eng.run_october()
-        new_items = [get_item(db, r["item_id"]) for r in db.q("SELECT item_id FROM work_items") if r["item_id"] not in before]
-        
-        # If no items were auto-created (bill existed), create one manually
-        if not new_items:
-            anchor = f"inject:accrual:{tag}:{v['id']}"
-            it = create_item(db, SYNC, "invoice_over_accrual", anchor,
-                            f"Review: {v['qbo_name']} invoiced ${params['amount']:.2f} vs accrued amount",
-                            "2026-09", [],
-                            evidence=[{"type": "bill", "id": bill_id if not bill_exists else "existing",
-                                      "source": "bills", "desc": f"Invoice for ${params['amount']:.2f}"}])
-            question = f"Review accrual variance for {v['qbo_name']}: invoice shows ${params['amount']:.2f}. Verify against accrued amount and adjust if needed."
-            rationale = f"{v['qbo_name']} invoice amount ${params['amount']:.2f} needs reconciliation with accrual."
-            patch = {"vendor": v["qbo_name"], "vendor_id": v["id"], "invoice_amount": cents,
-                    "question": question, "rationale": rationale, "injected": text or template}
-            it = transition(db, it["item_id"], "ask", JARVIS, patch, reason=rationale)
-            new_items.append(it)
-        
-        created = new_items
+        # ALWAYS create our own specific work item for the over-accrual scenario
+        # Do NOT grab random items from eng.run_october() (might be unrelated like interest receivable)
+        anchor = f"inject:accrual:{tag}:{v['id']}"
+        it = create_item(db, SYNC, "invoice_over_accrual", anchor,
+                        f"Review: {v['qbo_name']} invoiced ${params['amount']:.2f} vs accrued amount",
+                        "2026-09", [],
+                        evidence=[{"type": "bill", "id": bill_id if not bill_exists else "existing",
+                                  "source": "bills", "desc": f"Invoice for ${params['amount']:.2f}"}])
+        question = f"Review accrual variance for {v['qbo_name']}: invoice shows ${params['amount']:.2f}. Verify against accrued amount and adjust if needed."
+        rationale = f"{v['qbo_name']} invoice amount ${params['amount']:.2f} needs reconciliation with accrual."
+        patch = {"vendor": v["qbo_name"], "vendor_id": v["id"], "invoice_amount": cents,
+                "question": question, "rationale": rationale, "injected": text or template}
+        it = transition(db, it["item_id"], "ask", JARVIS, patch, reason=rationale)
+        created.append(it)
     
     elif template == "vendor_bank_change":
         # Create work item for vendor bank detail change - MUST verify via callback before payment
@@ -718,10 +752,20 @@ def inject(session, text: str | None = None, template: str | None = None, params
         else:
             count = len(amounts)
         
-        merchant = params.get("merchant") or params.get("vendor", "Office Depot")
-        d = params.get("date", "2026-09-20")
-        source = params.get("source", "Ramp")
-        approval_limit = params.get("approval_limit", 2500.0)
+        # For free text, do NOT use defaults - these must be parsed or asked
+        if from_free_text:
+            merchant = params.get("merchant") or params.get("vendor")
+            if not merchant:
+                merchant = "Unknown Merchant"  # Will be visible in work item
+            d = params.get("date", "2026-09-29")  # Sep end default
+            source = params.get("source", "Unknown")
+            approval_limit = params.get("approval_limit", 0)  # No limit assumed
+        else:
+            # Template call - use defaults
+            merchant = params.get("merchant") or params.get("vendor", "Office Depot")
+            d = params.get("date", "2026-09-20")
+            source = params.get("source", "Ramp")
+            approval_limit = params.get("approval_limit", 2500.0)
         
         record_ids = []
         # Create ALL N charges first
@@ -846,7 +890,8 @@ def inject(session, text: str | None = None, template: str | None = None, params
         # Customer refund incorrectly booked as revenue - flag for review, NOT direct post
         merchant = params.get("merchant", "Bay Rig Rentals")
         cents = int(params["amount"] * 100)
-        d = params.get("date", "2026-09-25")
+        # For free text, use parsed date or default to Sep end; for template use template default
+        d = params.get("date", "2026-09-27" if not from_free_text else "2026-09-27")
         
         # Create the incorrect revenue entry first (simulating the misclassification)
         # BUT: do NOT directly debit 1010 without a bank record
@@ -872,7 +917,9 @@ def inject(session, text: str | None = None, template: str | None = None, params
                                   "desc": f"${params['amount']:.2f} from {merchant} described as refund but may be in 4950 Other Income"}])
         
         # Route through NEEDS_INFO for review (not PROPOSED)
-        question = f"Review: Is the ${params['amount']:.2f} credit from {merchant} on {d} a customer refund incorrectly booked to 4950 Other Income? If so, it should be reclassified to contra-expense account {original_acct} ({bible.acct_name(original_acct)})."
+        # Only mention date in question if it was actually provided (not invented)
+        date_clause = f" on {d}" if params.get("date") else ""
+        question = f"Review: Is the ${params['amount']:.2f} credit from {merchant}{date_clause} a customer refund incorrectly booked to 4950 Other Income? If so, it should be reclassified to contra-expense account {original_acct} ({bible.acct_name(original_acct)})."
         rationale = f"Potential misclassification: ${params['amount']:.2f} from {merchant} may be a refund booked as revenue instead of contra-expense."
         
         patch = {
