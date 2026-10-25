@@ -102,17 +102,41 @@ def client():
     return _client
 
 
-def complete(system: str, user: str, fast: bool = False, max_tokens: int = 2000) -> str | None:
+def complete(system: str, user: str, fast: bool = False, max_tokens: int = 2000, db=None, actor_name: str = "ai_agent") -> str | None:
+    """Call LLM with optional audit logging. Pass db to log the call."""
     if not available():
         return None
     try:
         models = _select_models()
         model_id = models["fast"] if fast else models["reasoning"]
+        
+        # Log LLM call to audit (no secrets, just metadata)
+        if db:
+            from jarvis.work.transition import log as audit_log
+            from jarvis.work.roles import actor
+            audit_log(db, actor(actor_name), "llm_call", f"model:{model_id}", 
+                     f"LLM call: {system[:100]}...", evidence=[{"user_prompt_length": len(user), "max_tokens": max_tokens}])
+        
         msg = client().messages.create(
             model=model_id, max_tokens=max_tokens,
             system=system, messages=[{"role": "user", "content": user}])
-        return "".join(b.text for b in msg.content if getattr(b, "type", "") == "text").strip()
-    except Exception as e:  # network / quota - fall back to templates
+        result = "".join(b.text for b in msg.content if getattr(b, "type", "") == "text").strip()
+        
+        # Log success
+        if db and result:
+            from jarvis.work.transition import log as audit_log
+            from jarvis.work.roles import actor
+            audit_log(db, actor(actor_name), "llm_success", f"model:{model_id}", 
+                     f"LLM returned {len(result)} chars")
+        
+        return result
+    except Exception as e:
+        # Log failure
+        if db:
+            from jarvis.work.transition import log as audit_log
+            from jarvis.work.roles import actor
+            audit_log(db, actor(actor_name), "llm_failed", f"model:{models.get('fast' if fast else 'reasoning', 'unknown')}", 
+                     f"LLM call failed: {type(e).__name__}: {str(e)[:200]}")
         return None
 
 
