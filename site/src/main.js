@@ -604,7 +604,7 @@ function initPresentMode() {
           and cannot pass anything to humans without Controller hash-approval.</p>
           <div class="slide-credits">
             <p class="credit-line">Built solo by Alexander Le · UC Berkeley, with Cursor and Grok Bot</p>
-            <p class="inspiration-line">Inspired by my best friend, an accountant. These are the real close pain points they deal with.</p>
+            <p class="inspiration-line">Inspired by my boyfriend, an accountant. Over dinner I kept hearing how stressful the month-end close is for him. These are the real pain points he deals with.</p>
           </div>
         </div>
       `
