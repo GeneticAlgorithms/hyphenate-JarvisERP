@@ -124,6 +124,17 @@ class Run:
     # ---------------------------------------------------------------- proposals (system-of-record changes)
     def propose(self, kind: str, title: str, proposal: dict, rationale: str, evidence: list, confidence: float = 0.9,
                 escalate: bool = False, question: str = "") -> str:
+        # Apply materiality: amounts above threshold require higher scrutiny
+        from jarvis.world import bible
+        materiality_cents = bible.BIBLE.get("materiality_cents", 50000)
+        total_cents = sum(abs(line.get("cents", 0)) for line in proposal.get("lines", []))
+        if total_cents >= materiality_cents:
+            original_conf = confidence
+            confidence = min(confidence, 0.85)  # Cap confidence for material items
+            if original_conf > confidence:
+                self.log("decide", f"Amount {fmt(total_cents)} exceeds materiality threshold {fmt(materiality_cents)} "
+                         f"— confidence capped at {confidence:.0%} (was {original_conf:.0%}), requires manual review")
+        
         anchor = f"{self.id}:{kind}:{len(self.proposals) + 1}"
         it = create_item(self.wb.db, SYNC, kind, anchor, title, "2026-09", [self.id])
         patch = {"kind": kind, "proposal": {"kind": kind, **proposal, "escalate": escalate, "run_id": self.id},
