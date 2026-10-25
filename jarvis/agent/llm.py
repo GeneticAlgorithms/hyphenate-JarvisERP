@@ -4,17 +4,63 @@ scenarios. Claude never produces a number that the code does not recompute."""
 from __future__ import annotations
 
 import json
+import re
 
 from jarvis import config
 
 _client = None
-
-
 _llm_test_result = None  # cache: None = not tested, True = live, False = failed
+_selected_models = None  # cache: {"fast": model_id, "reasoning": model_id}
 
 
 def available() -> bool:
     return bool(config.ANTHROPIC_API_KEY)
+
+
+def _select_models() -> dict[str, str]:
+    """Query Anthropic API for available models and pick newest Sonnet/Haiku."""
+    global _selected_models
+    if _selected_models is not None:
+        return _selected_models
+    
+    # Fallback to configured models
+    fallback = {"fast": config.MODEL_FAST, "reasoning": config.MODEL_REASONING}
+    
+    if not available():
+        _selected_models = fallback
+        return _selected_models
+    
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY, base_url=config.ANTHROPIC_URL)
+        models_response = client.models.list()
+        
+        # Extract model IDs
+        available_models = [m.id for m in models_response.data if hasattr(m, 'id')]
+        
+        # Find newest sonnet (reasoning) and haiku (fast)
+        # Model naming: claude-3-5-sonnet-YYYYMMDD or claude-3-5-haiku-YYYYMMDD
+        sonnet_pattern = re.compile(r'claude-\d+-\d+-sonnet-(\d{8})')
+        haiku_pattern = re.compile(r'claude-\d+-\d+-haiku-(\d{8})')
+        
+        sonnets = [(m, sonnet_pattern.search(m)) for m in available_models]
+        sonnets = [(m, match.group(1)) for m, match in sonnets if match]
+        sonnets.sort(key=lambda x: x[1], reverse=True)  # Newest first
+        
+        haikus = [(m, haiku_pattern.search(m)) for m in available_models]
+        haikus = [(m, match.group(1)) for m, match in haikus if match]
+        haikus.sort(key=lambda x: x[1], reverse=True)
+        
+        _selected_models = {
+            "reasoning": sonnets[0][0] if sonnets else fallback["reasoning"],
+            "fast": haikus[0][0] if haikus else fallback["fast"]
+        }
+        
+    except Exception as e:
+        # Fall back to configured models on any error
+        _selected_models = fallback
+    
+    return _selected_models
 
 
 def client():
