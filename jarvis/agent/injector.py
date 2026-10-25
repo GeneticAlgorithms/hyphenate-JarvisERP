@@ -230,10 +230,11 @@ def inject(session, text: str | None = None, template: str | None = None, params
         v = next((x for x in bible.VENDORS if x["qbo_name"] == params["vendor"]), None)
         if v:
             anchor = f"inject:bank_change:{tag}"
-            it = create_item(db, SYNC, "bank_change", anchor, f"Vendor {params['vendor']} changed bank details before ${params['amount']/100:.2f} payment",
+            it = create_item(db, SYNC, "bank_change", anchor, f"Vendor {params['vendor']} changed bank details before ${params['amount']:.2f} payment",
                             "2026-09", [])
             patch = {"alert": f"Vendor {params['vendor']} emailed new bank details before payment", "amount_cents": int(params['amount'] * 100),
                      "requires": "callback_verification", "injected": text or template}
+            from jarvis.work.transition import transition
             transition(db, it["item_id"], "needs_info", JARVIS, patch, reason="Bank detail change requires verification call")
             created.append(it)
     
@@ -260,26 +261,26 @@ def inject(session, text: str | None = None, template: str | None = None, params
     
     elif template == "ghost_vendor":
         # Payment to non-existent vendor
-        with db.tx():
-            anchor = f"inject:ghost:{tag}"
-            it = create_item(db, SYNC, "ghost_vendor", anchor, f"Payment to '{params.get('vendor', 'Advanced Solutions Inc')}' for ${params['amount']:.2f} but vendor not in master",
-                            "2026-09", [])
-            patch = {"vendor_name": params.get("vendor", "Advanced Solutions Inc"), "amount_cents": int(params['amount'] * 100),
-                     "date": params["date"], "no_w9": True, "no_contract": True, "requires": "vendor_verification", "injected": text or template}
-            transition(db, it["item_id"], "needs_info", JARVIS, patch, reason="Payment to vendor not in master; no W-9 or contract on file")
-            created.append(it)
+        anchor = f"inject:ghost:{tag}"
+        it = create_item(db, SYNC, "ghost_vendor", anchor, f"Payment to '{params.get('vendor', 'Advanced Solutions Inc')}' for ${params['amount']:.2f} but vendor not in master",
+                        "2026-09", [])
+        patch = {"vendor_name": params.get("vendor", "Advanced Solutions Inc"), "amount_cents": int(params['amount'] * 100),
+                 "date": params["date"], "no_w9": True, "no_contract": True, "requires": "vendor_verification", "injected": text or template}
+        from jarvis.work.transition import transition
+        transition(db, it["item_id"], "needs_info", JARVIS, patch, reason="Payment to vendor not in master; no W-9 or contract on file")
+        created.append(it)
     
     elif template == "refund_as_revenue":
         # Refund booked as revenue instead of contra-expense
         cents = int(params['amount'] * 100)
-        with db.tx():
-            anchor = f"inject:refund:{tag}"
-            it = create_item(db, SYNC, "refund_misclass", anchor, f"+${params['amount']:.2f} from {params.get('merchant', 'Stripe')} is a refund, not revenue",
-                            "2026-09", [])
-            patch = {"merchant": params.get("merchant", "Stripe"), "amount_cents": cents, "date": params["date"],
-                     "booked_to": "4950", "should_be": "contra_expense", "injected": text or template}
-            transition(db, it["item_id"], "needs_info", JARVIS, patch, reason="Credit classified as revenue; should be contra-expense/refund")
-            created.append(it)
+        anchor = f"inject:refund:{tag}"
+        it = create_item(db, SYNC, "refund_misclass", anchor, f"+${params['amount']:.2f} from {params.get('merchant', 'Stripe')} is a refund, not revenue",
+                        "2026-09", [])
+        patch = {"merchant": params.get("merchant", "Stripe"), "amount_cents": cents, "date": params["date"],
+                 "booked_to": "4950", "should_be": "contra_expense", "injected": text or template}
+        from jarvis.work.transition import transition
+        transition(db, it["item_id"], "needs_info", JARVIS, patch, reason="Credit classified as revenue; should be contra-expense/refund")
+        created.append(it)
     
     elif template == "paypal_bundle":
         d = params["date"]

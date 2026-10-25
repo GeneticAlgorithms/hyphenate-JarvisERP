@@ -187,7 +187,7 @@ class Engine:
         if llm.available() and plan.action == "propose" and plan.kind in ("paypal_split", "accrual", "duplicate"):
             better = llm.complete("You are Jarvis, an autonomous staff accountant. Rewrite this rationale in 2-4 crisp "
                                   "sentences for the Controller. Keep every number exactly as given. No new facts.",
-                                  plan.rationale, fast=True, max_tokens=300, db=self.db, actor_name="ai_agent")
+                                  plan.rationale, fast=True, max_tokens=300, db=self.db, actor_name="jarvis")
             if better:
                 plan.rationale = better
         it = self._apply(item, plan)

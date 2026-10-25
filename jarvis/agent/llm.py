@@ -131,17 +131,20 @@ def complete(system: str, user: str, fast: bool = False, max_tokens: int = 2000,
         
         return result
     except Exception as e:
-        # Log failure
+        # Log failure (never raise from audit logging)
         if db:
-            from jarvis.work.transition import log as audit_log
-            from jarvis.work.roles import actor
-            audit_log(db, actor(actor_name), "llm_failed", f"model:{models.get('fast' if fast else 'reasoning', 'unknown')}", 
-                     f"LLM call failed: {type(e).__name__}: {str(e)[:200]}")
+            try:
+                from jarvis.work.transition import log as audit_log
+                from jarvis.work.roles import actor
+                audit_log(db, actor(actor_name), "llm_failed", f"model:{models.get('fast' if fast else 'reasoning', 'unknown')}", 
+                         f"LLM call failed: {type(e).__name__}: {str(e)[:200]}")
+            except Exception:
+                pass  # Never raise from audit logging
         return None
 
 
-def complete_json(system: str, user: str, fast: bool = True) -> dict | None:
-    out = complete(system + "\nRespond with a single JSON object and nothing else.", user, fast=fast)
+def complete_json(system: str, user: str, fast: bool = True, db=None, actor_name: str = "jarvis") -> dict | None:
+    out = complete(system + "\nRespond with a single JSON object and nothing else.", user, fast=fast, db=db, actor_name=actor_name)
     if not out:
         return None
     try:
