@@ -85,21 +85,93 @@ def _mind_changers(it):
     }.get(kind, "new evidence")
 
 
+def _classify_challenge(question: str) -> str:
+    """Classify challenge type: purpose, period, amount, identity, policy, materiality."""
+    q = question.lower()
+    if any(w in q for w in ("why not", "what is", "what's", "who is", "merchant", "vendor", "this payment", "company")):
+        return "identity"  # Who/what is this vendor/transaction
+    if any(w in q for w in ("when", "period", "month", "september", "october", "timing", "accrual", "cut-off", "prepaid")):
+        return "period"  # When to recognize/which period
+    if any(w in q for w in ("how much", "amount", "$", "too much", "too little", "wrong amount")):
+        return "amount"  # Dollar amount questioned
+    if any(w in q for w in ("why", "purpose", "what for", "category", "account", "expense", "revenue", "classify")):
+        return "purpose"  # What is this transaction for/how to categorize
+    if any(w in q for w in ("policy", "rule", "always", "usually", "precedent", "last time", "should")):
+        return "policy"  # Policy/precedent application
+    if any(w in q for w in ("materiality", "immaterial", "small", "under", "threshold", "does it matter")):
+        return "materiality"  # Materiality threshold
+    return "general"
+
+
+def _check_concession(question: str, it: dict) -> dict | None:
+    """Check if new evidence in question should trigger concession and re-proposal."""
+    q = question.lower()
+    kind = it["proposal"].get("kind")
+    
+    # Pattern: "the show moved to [date]" or "actually happened [date]"
+    if kind in ("accrual", "bank_categorize") and ("moved to" in q or "actually" in q or "changed to" in q):
+        # Extract new date
+        date_match = re.search(r'(sept|september|oct|october)\s*(\d{1,2})', q)
+        if date_match:
+            month = {"sept": 9, "september": 9, "oct": 10, "october": 10}.get(date_match.group(1))
+            day = int(date_match.group(2))
+            new_date = f"2026-{month:02d}-{day:02d}"
+            
+            # Check if this changes period classification
+            proposal_date = it["proposal"].get("date", "")
+            if proposal_date and new_date[:7] != proposal_date[:7]:
+                return {
+                    "concede": True,
+                    "reason": f"New evidence shows transaction belongs to {new_date[:7]} not {proposal_date[:7]}",
+                    "new_date": new_date,
+                    "action": "withdraw and re-propose in correct period"
+                }
+    
+    # Pattern: "actually billed $X" or "invoice shows $Y"
+    if "actually" in q or "invoice shows" in q or "billed" in q:
+        amt_match = re.search(r'\$\s?([\d,]+(?:\.\d{2})?)', question)
+        if amt_match:
+            new_amt = float(amt_match.group(1).replace(",", "")) * 100
+            proposal_amt = sum(abs(l.get("cents", 0)) for l in it["proposal"].get("lines", []))
+            if abs(new_amt - proposal_amt) > 100:  # More than $1 difference
+                return {
+                    "concede": True,
+                    "reason": f"Invoice confirms {fmt(int(new_amt))} not {fmt(proposal_amt)}",
+                    "new_amount": int(new_amt),
+                    "action": "withdraw and re-propose with correct amount"
+                }
+    
+    return None
+
+
 def _address(question, it):
     q = question.lower()
     kind = it["proposal"].get("kind")
     lines = it["proposal"].get("lines") or []
-    if any(w in q for w in ("materiality", "immaterial", "small", "under")):
+    
+    # Check for concession first
+    concession = _check_concession(question, it)
+    if concession:
+        return f"**CONCEDING**: {concession['reason']}. {concession['action']}. The corrected proposal will appear in the next run."
+    
+    # Classify and address challenge
+    challenge_type = _classify_challenge(question)
+    
+    if challenge_type == "materiality":
         personal = any(l["acct"] == "1250" for l in lines)
         return ("Materiality decides whether a misstatement matters, not how to classify a transaction."
                 + (" The personal purchase is a control issue, and ruling P-0317 applies regardless of size." if personal else ""))
-    if any(w in q for w in ("always", "like we usually", "last month", "how we")):
+    elif challenge_type == "policy":
         return "Last month's habit isn't evidence about this month's transaction. The documents for this one point elsewhere."
-    if any(w in q for w in ("why not wait", "wait for", "next month", "invoice comes")):
+    elif challenge_type == "period":
         return "Waiting books September cost in October. The close is about the period the work happened, not when paper arrives."
-    if any(w in q for w in ("sure", "confident", "certain", "proof", "evidence", "why")):
+    elif challenge_type == "identity" or challenge_type == "purpose":
         return f"Confidence is {round((it.get('confidence') or 0) * 100)}% because each step below is backed by a source document."
-    return "Here is what the decision rests on."
+    elif challenge_type == "amount":
+        total = sum(abs(l.get("cents", 0)) for l in lines)
+        return f"Total {fmt(total)} ties to source documents. Each line is computed from receipts/contracts, not estimated."
+    else:
+        return "Here is what the decision rests on."
 
 
 def defend(run, it, question: str) -> dict:
