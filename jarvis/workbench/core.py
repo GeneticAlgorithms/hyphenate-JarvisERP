@@ -128,13 +128,11 @@ class Run:
         from jarvis.world import bible
         from jarvis.money import fmt
         materiality_cents = bible.APPROVAL_MATRIX.get("materiality_cents", 50000)
-        total_cents = sum(abs(line.get("cents", 0)) for line in proposal.get("lines", []))
+        # Sum debits only (positive cents) to avoid double-counting in double-entry
+        total_cents = sum(line.get("cents", 0) for line in proposal.get("lines", []) if line.get("cents", 0) > 0)
         if total_cents >= materiality_cents:
-            original_conf = confidence
-            confidence = min(confidence, 0.85)  # Cap confidence for material items
-            if original_conf > confidence:
-                self.log("decide", f"Amount {fmt(total_cents)} exceeds materiality threshold {fmt(materiality_cents)} "
-                         f"— confidence capped at {confidence:.0%} (was {original_conf:.0%}), requires manual review")
+            self.log("decide", f"Amount {fmt(total_cents)} exceeds materiality threshold {fmt(materiality_cents)} "
+                         f"— requires manual review")
         
         anchor = f"{self.id}:{kind}:{len(self.proposals) + 1}"
         it = create_item(self.wb.db, SYNC, kind, anchor, title, "2026-09", [self.id])
