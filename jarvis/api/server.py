@@ -69,6 +69,11 @@ def index():
     return FileResponse(config.UI_DIR / "workbench.html")
 
 
+@app.get("/landing", response_class=HTMLResponse)
+def landing():
+    return FileResponse(config.UI_DIR / "landing.html")
+
+
 @app.get("/synapse", response_class=HTMLResponse)
 def synapse():
     return FileResponse(config.UI_DIR / "synapse.html")
@@ -111,9 +116,13 @@ def state():
     for p in pols:
         p["evidence"] = L(p["evidence"], [])
         p["matcher"] = L(p["matcher"], {})
+    # Test LLM live, not just if key is configured
+    llm_test = llm.test_live()
+    llm_live = llm_test.get("status") == "live"
+    
     return {"seed": s.seed, "company": "Afterglow Labs, Inc.", "period": config.CLOSE_PERIOD, "bootstrapped": boot,
             "phase": db.kv_get("phase"), "world_date": db.kv_get("world_date"), "busy": STATE["busy"],
-            "auto_controller": STATE["auto_controller"], "llm": llm.available(), "search": s.ctx.search.status(),
+            "auto_controller": STATE["auto_controller"], "llm": llm_live, "search": s.ctx.search.status(),
             "paypal_fault": sync.PayPalAPI.fault, "status": st, "policies": pols,
             "counts": {"records": db.one("SELECT COUNT(*) n FROM records")["n"],
                        "docs": db.one("SELECT COUNT(*) n FROM docs")["n"],
@@ -122,6 +131,12 @@ def state():
                        "audit": db.one("SELECT COUNT(*) n FROM audit_log")["n"],
                        "denied": db.one("SELECT COUNT(*) n FROM audit_log WHERE allowed=0")["n"]},
             "templates": {k: v["label"] for k, v in injector.TEMPLATES.items()}}
+
+
+@app.get("/api/llm_status")
+def llm_status():
+    """Test if LLM is actually live (not just configured)."""
+    return llm.test_live()
 
 
 @app.get("/api/graph")
@@ -316,9 +331,9 @@ def challenge(item_id: str, body: dict = Body(...)):
 
 @app.post("/api/item/{item_id}/self-approve")
 def self_approve(item_id: str):
-    r = S().try_self_approve(item_id)
+    r = _safe(S().try_self_approve, item_id)
     events.publish("refresh")
-    return r
+    return r if isinstance(r, JSONResponse) else r
 
 
 @app.post("/api/policy/{policy_id}/{version}/{decision}")
@@ -330,11 +345,24 @@ def policy_decide(policy_id: str, version: int, decision: str):
 
 @app.post("/api/inject")
 def inject(body: dict = Body(...)):
+    from jarvis.work.transition import append_audit, log as audit_log
+    from jarvis.work.roles import actor
     holder = {}
+    SYNC = actor("sync")
 
     def run():
-        holder["r"] = S().inject(text=body.get("text"), template=body.get("template"), params=body.get("params"))
-        events.publish("inject_done", result=holder["r"])
+        try:
+            holder["r"] = S().inject(text=body.get("text"), template=body.get("template"), params=body.get("params"))
+            # Success already logged in injector.inject()
+            events.publish("inject_done", result=holder["r"])
+        except Exception as e:
+            # Log injection failure to audit log
+            reason = f"Injection failed: {type(e).__name__}: {str(e)[:200]}"
+            with S().db.tx():
+                append_audit(S().db, SYNC, "inject_failed", f"scenario:{body.get('template') or 'parse'}", 
+                           False, reason, {"error": str(e)[:400], "traceback": traceback.format_exc()[-800:]})
+            holder["r"] = {"success": False, "error": str(e), "template": body.get("template")}
+            events.publish("inject_done", result=holder["r"])
     return background("inject", run)
 
 

@@ -56,6 +56,31 @@ async function boot() {
   $("#auditRun").onchange = e => loadAudit(e.target.value);
   $("#auditVerify").onclick = async () => { const v = await verifyChain(); $("#auditMsg").textContent = v.ok ?
     `✓ ${v.rows} rows re-hashed, chain intact · head ${v.head.slice(0, 16)}…` : `✗ chain broken at row ${v.broken_at}`; };
+  checkLLMStatus();
+  $("#llm-badge").onclick = checkLLMStatus;
+}
+
+async function checkLLMStatus() {
+  const badge = $("#llm-badge");
+  badge.textContent = "LLM: testing…";
+  badge.className = "chip llm-badge";
+  try {
+    const status = await api("/api/llm_status");
+    if (status.status === "live") {
+      badge.textContent = `LLM: ✓ LIVE`;
+      badge.className = "chip llm-badge live";
+      badge.title = `Claude ${status.model || "connected"} — real LLM responses`;
+    } else {
+      badge.textContent = `LLM: deterministic`;
+      badge.className = "chip llm-badge fallback";
+      const reason = status.reason ? ` (${status.reason})` : "";
+      badge.title = `Using deterministic templates${reason} — no API key or connection failed. System still fully functional.`;
+    }
+  } catch (e) {
+    badge.textContent = "LLM: error";
+    badge.className = "chip llm-badge error";
+    badge.title = `Error checking LLM: ${e.message}`;
+  }
 }
 const problem = () => S.problems.find(p => p.id === S.tab);
 function problemOfAgent(agent) { return S.problems.find(p => p.agents.includes(agent))?.id; }
@@ -163,11 +188,21 @@ function buildFilters() {
 }
 function logEl(e) {
   const hasData = e.data !== null && e.data !== undefined;
-  const el = h("div", { class: `ln ${e.msg.startsWith("▶") ? "stagehead" : ""} ${hasData ? "hasdata" : ""} ${e.level === "deny" ? "deny" : ""} ${e.moment ? "mom" : ""}`, "data-seq": e.seq },
-    h("span", { class: "seq" }, e.seq), h("span", { class: "tm" }, hhmmss(e.t)),
+  const auditBadge = h("span", { 
+    class: "audit-badge", 
+    title: `Click to view audit row #${e.audit_seq || '?'}\nsha256 ${e.hash || '?'}`,
+    onclick: () => { selectTab("audit"); setTimeout(() => { 
+      const row = document.querySelector(`#auditTable tr[data-seq="${e.audit_seq}"]`);
+      if (row) { row.scrollIntoView({ behavior: "smooth", block: "center" }); row.classList.add("highlight"); 
+        setTimeout(() => row.classList.remove("highlight"), 2000); }
+    }, 100); }
+  }, `audit #${e.audit_seq || '?'} · ${String(e.hash || "").slice(0, 6)}`);
+  
+  const el = h("div", { class: `ln ${e.msg.startsWith("▶") ? "stagehead" : ""} ${hasData ? "hasdata" : ""} ${e.level === "deny" ? "deny" : ""} ${e.moment ? "mom" : ""}`, "data-seq": e.seq, "data-audit": e.audit_seq },
+    h("span", { class: "seq", title: `Log #${e.seq}` }, e.seq), h("span", { class: "tm" }, hhmmss(e.t)),
     h("span", { class: `lv lv-${e.level}`, title: LEVEL_TIPS[e.level] }, e.level),
     h("span", { class: "msg" }, e.moment ? h("span", { class: `tag ${e.moment}`, title: "a moment: " + e.moment }, "★ " + e.moment) : null, e.msg),
-    h("span", { class: "hash", title: `audit row #${e.audit_seq}\nsha256 ${e.hash}` }, `#${e.audit_seq} ${String(e.hash || "").slice(0, 8)}`));
+    auditBadge);
   if (hasData) el.querySelector(".msg").onclick = () => {
     const d = el.querySelector(".data"); if (d) return d.remove();
     el.append(h("div", { class: "data" }, JSON.stringify(e.data, null, 2)));
@@ -496,7 +531,7 @@ async function loadAudit(id) {
   $("#auditMsg").textContent = `${rows.length} rows for ${id}`;
   $("#auditTable").replaceChildren(h("table", { class: "t" },
     h("tr", {}, ["#", "at (UTC)", "actor", "role", "action", "subject", "allowed", "reason", "prev → hash"].map(x => h("th", {}, x))),
-    rows.map(r => h("tr", { class: r.allowed ? "" : "deny-row" }, h("td", { class: "n" }, r.seq), h("td", {}, (r.at || "").slice(11, 23)),
+    rows.map(r => h("tr", { class: r.allowed ? "" : "deny-row", "data-seq": r.seq }, h("td", { class: "n" }, r.seq), h("td", {}, (r.at || "").slice(11, 23)),
       h("td", {}, r.actor), h("td", {}, r.actor_role), h("td", {}, r.action), h("td", {}, r.subject), h("td", {}, r.allowed ? "✓" : "✗ denied"),
       h("td", {}, r.reason), h("td", { title: `${r.prev_hash}\n→ ${r.hash}` }, `${String(r.prev_hash).slice(0, 6)} → ${String(r.hash).slice(0, 8)}`)))));
 }

@@ -35,7 +35,7 @@ def controller_decide(item: dict) -> tuple[str, str]:
             "You are Maya Chen, Controller at Afterglow Labs. Busy, precise, cares about cut-off and segregation of "
             "duties. Approve or reject the proposed entry. Reject only for a concrete accounting reason.",
             f"Proposal: {item['title']}\nKind: {item['kind']}\nLines: {item['proposal'].get('lines')}\n"
-            f"Rationale: {item['rationale']}\nReturn {{\"decision\": \"approve\"|\"reject\", \"reason\": \"...\"}}")
+            f"Rationale: {item['rationale']}\nReturn {{\"decision\": \"approve\"|\"reject\", \"reason\": \"...\"}}", actor_name="maya")
         if out and out.get("decision") in ("approve", "reject"):
             return out["decision"], out.get("reason", "")
     reasons = {"paypal_split": "Agree - deposit is for November, keep it in prepaid.",
@@ -53,7 +53,7 @@ def controller_answer(item: dict) -> str:
             return ans
     if llm.available():
         out = llm.complete("You are Maya Chen, Controller. Answer the accountant's question in one or two sentences. "
-                           "If you genuinely don't know, say so and say what to do.", item.get("question", ""), fast=True)
+                           "If you genuinely don't know, say so and say what to do.", item.get("question", ""), fast=True, db=eng.db, actor_name="human_controller")
         if out:
             return out
     if item["kind"] == "aging":

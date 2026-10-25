@@ -234,6 +234,31 @@ def _is_personal(ctx: Ctx, name: str, item_text: str, mcc: str = "") -> tuple[bo
     stats = pol["matcher"] if pol else {}
     mccs = set(stats.get("mccs", []))
     kws = stats.get("merchant_keywords", [])
+    
+    # Fall back to precedents if no active policy (e.g., before onboarding)
+    if not pol:
+        precs = ctx.precedents("personal")
+        if precs:
+            # Merge keywords and MCCs from ALL personal precedents
+            mccs = set()
+            kws = []
+            for prec in precs:
+                decision = prec.get("decision", {})
+                # Handle both dict and JSON string
+                if isinstance(decision, str):
+                    import json
+                    try:
+                        decision = json.loads(decision)
+                    except:
+                        decision = {}
+                if decision:
+                    prec_mccs = decision.get("personal_mccs", [])
+                    prec_kws = decision.get("personal_merchant_keywords", [])
+                    mccs.update(prec_mccs if prec_mccs else [])
+                    kws.extend(prec_kws if prec_kws else [])
+            # Dedupe keywords
+            kws = list(set(kws))
+    
     text = norm(f"{name} {item_text}")
     if mcc and mcc in mccs:
         return True, f"MCC {mcc} ({bible.PERSONAL_MCC.get(mcc, 'personal category')}) is on ruling P-0317's list"

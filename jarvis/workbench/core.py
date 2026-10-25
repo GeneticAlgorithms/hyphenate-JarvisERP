@@ -124,6 +124,16 @@ class Run:
     # ---------------------------------------------------------------- proposals (system-of-record changes)
     def propose(self, kind: str, title: str, proposal: dict, rationale: str, evidence: list, confidence: float = 0.9,
                 escalate: bool = False, question: str = "") -> str:
+        # Apply materiality: amounts above threshold require higher scrutiny
+        from jarvis.world import bible
+        from jarvis.money import fmt
+        materiality_cents = bible.APPROVAL_MATRIX.get("materiality_cents", 50000)
+        # Sum debits only (positive cents) to avoid double-counting in double-entry
+        total_cents = sum(line.get("cents", 0) for line in proposal.get("lines", []) if line.get("cents", 0) > 0)
+        if total_cents >= materiality_cents:
+            self.log("decide", f"Amount {fmt(total_cents)} exceeds materiality threshold {fmt(materiality_cents)} "
+                         f"— requires manual review")
+        
         anchor = f"{self.id}:{kind}:{len(self.proposals) + 1}"
         it = create_item(self.wb.db, SYNC, kind, anchor, title, "2026-09", [self.id])
         patch = {"kind": kind, "proposal": {"kind": kind, **proposal, "escalate": escalate, "run_id": self.id},
@@ -192,12 +202,18 @@ class Workbench:
 
     # ---------------------------------------------------------------- approvals -> gateway
     def decide(self, item_id: str, decision: str, reason: str = "", who: str = "maya") -> dict:
+        from jarvis.work.gateway import ValidationError
+        
         it = get_item(self.db, item_id)
         run = self.runs.get(it["proposal"].get("run_id"))
         if decision == "approve":
             transition(self.db, item_id, "approve", actor(who), {"answer": reason} if reason else None,
                        reason=reason or "Approved")
-            res = self.apply(item_id, run)
+            try:
+                res = self.apply(item_id, run)
+            except ValidationError as e:
+                # Gateway validation failed - entry doesn't balance or violates rules
+                raise ValidationError(f"Entry validation failed: {str(e)}")
         else:
             transition(self.db, item_id, "reject", actor(who), {"answer": reason}, reason=reason or "Rejected")
             res = {"rejected": True}

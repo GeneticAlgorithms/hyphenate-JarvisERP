@@ -222,3 +222,85 @@ def apply(r, it):
                   f"Controller confirmed: {ans or 'crew cost'}", [], 0.95)
         return f"answer recorded: {ans or 'crew cost'}; follow-up entry proposed"
     return "applied"
+
+
+def on_reject(r, it, reason):
+    """Handle Controller rejection - record as precedent and re-plan."""
+    # Record the rejection as a precedent
+    prec_id = f"PREC-{abs(hash(it['item_id'] + reason)) % 10**6:06d}"
+    r.wb.db.conn.execute(
+        "INSERT INTO precedents (prec_id, date, period, pattern, summary, decision, decided_by, status, refs, source_item) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (prec_id, "2026-09-30", it.get("period", "2026-09"), it["kind"], it["title"][:200], reason[:500], "maya", "active", "[]", it["item_id"])
+    )
+    
+    r.log("decide", f"Controller rejected: \"{reason}\". Recorded as precedent; will apply in future similar transactions.", pause=0.8)
+    
+    # If rejection mentions a specific amount or categorization, extract and re-propose
+    amt_match = re.search(r'\$\s?([\d,]+(?:\.\d{2})?)', reason)
+    if amt_match and it["kind"] in ("bank_categorize", "paypal_split"):
+        from jarvis.money import to_cents
+        from jarvis.work.transition import create_item, transition
+        from jarvis.work.roles import actor
+        from jarvis.work.sync import SYNC
+        
+        # Parse the dollar amount
+        amt_str = amt_match.group(0).replace("$", "").replace(",", "")
+        new_amt = to_cents(amt_str)
+        r.log("decide", f"Detected correction to {fmt(new_amt)}; re-proposing with updated amount...", pause=0.5)
+        
+        # Create corrected proposal - adjust only the disputed line
+        import copy
+        corrected_proposal = copy.deepcopy(it["proposal"])
+        lines = corrected_proposal.get("lines", [])
+        cash_accounts = ("1010", "1030")
+        
+        # Find the disputed line (largest debit that isn't cash)
+        debit_lines = [l for l in lines if l.get("cents", 0) > 0 and l.get("acct") not in cash_accounts]
+        
+        if debit_lines:
+            # Adjust only the largest debit line (the one likely corrected)
+            target_line = max(debit_lines, key=lambda l: l.get("cents", 0))
+            old_amt = target_line["cents"]
+            target_line["cents"] = new_amt
+            
+            # Calculate the difference and add balancing line
+            diff = new_amt - old_amt
+            if diff != 0:
+                # Add balancing line (6810 Bank & FX Fees or ask)
+                balance_line = {
+                    "acct": "6810",
+                    "cents": -diff,
+                    "memo": f"Adjustment from Controller correction"
+                }
+                lines.append(balance_line)
+                r.log("decide", f"Adjusted {target_line['acct']} from {fmt(old_amt)} to {fmt(new_amt)}, added {fmt(abs(diff))} to 6810 to balance", pause=0.5)
+            
+            # Verify balance
+            balance_check = sum(l.get("cents", 0) for l in lines)
+            if balance_check == 0:
+                # Create new work item
+                jarvis = actor("jarvis")
+                new_it = create_item(r.wb.db, SYNC, it["kind"],
+                                   f"{it['anchor']}-corrected",
+                                   f"{it['title']} (corrected per Controller: {fmt(new_amt)})",
+                                   it["period"], it.get("tags", []))
+                
+                transition(r.wb.db, new_it["item_id"], "propose", jarvis,
+                          {"proposal": corrected_proposal,
+                           "evidence": it.get("evidence", []),
+                           "rationale": f"Re-proposed per Controller correction: {reason[:300]}",
+                           "confidence": 0.95},
+                          reason=f"Corrected after rejection: {reason[:200]}")
+                
+                r.proposals.append(new_it["item_id"])
+                r.log("decide", f"Re-proposed as {new_it['item_id']}", pause=0.8)
+            else:
+                r.log("warn", f"Corrected entry doesn't balance (off by {fmt(balance_check)}); routing to NEEDS_INFO", pause=0.8)
+        else:
+            # Can't auto-correct, route to NEEDS_INFO
+            r.log("decide", "Cannot determine which line to adjust - needs Controller clarification", pause=0.5)
+    
+    # Check for policy changes mentioned in rejection
+    if "policy" in reason.lower() or "always" in reason.lower():
+        r.log("decide", "Rejection mentions policy — will propose policy update after 3+ similar corrections.", pause=0.5)

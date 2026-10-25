@@ -106,7 +106,7 @@ def run(r, **_):
         r.log("fix", f"QBO GL export: removed {removed} report-chrome rows (company/title/period headers, blank lines, "
                      f"column header, 'TOTAL', 'Accrual Basis …' footer); carried section headers down onto {len(gl)} lines")
         for acct, tot in controls.items():
-            s = sum(g["amount_cents"] for g in gl if g["account"] == acct)
+            s = sum(g["amount_cents"] for g in gl if g["account"] == acct and g["amount_cents"] is not None)
             r.log("check" if s == tot else "warn", f"control total '{acct}': lines sum {fmt(s)} vs QBO 'Total for' {fmt(tot)} "
                   f"{'✓' if s == tot else '✗'}")
         r.artifact("table", "QBO General Ledger (normalized)", {"columns": ["account", "date", "type", "num", "name", "memo",

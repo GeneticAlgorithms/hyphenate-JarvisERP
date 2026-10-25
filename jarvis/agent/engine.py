@@ -187,7 +187,7 @@ class Engine:
         if llm.available() and plan.action == "propose" and plan.kind in ("paypal_split", "accrual", "duplicate"):
             better = llm.complete("You are Jarvis, an autonomous staff accountant. Rewrite this rationale in 2-4 crisp "
                                   "sentences for the Controller. Keep every number exactly as given. No new facts.",
-                                  plan.rationale, fast=True, max_tokens=300)
+                                  plan.rationale, fast=True, max_tokens=300, db=self.db, actor_name="jarvis")
             if better:
                 plan.rationale = better
         it = self._apply(item, plan)
@@ -198,6 +198,11 @@ class Engine:
         ctx = self.ctx
         events.publish("phase", name="close", text=f"Closing {period}")
         t0 = time.time()
+        
+        # Auto-onboard policies if any are pending (fixes order dependence bug I)
+        from jarvis.agent import personas
+        personas.auto_controller(self, max_rounds=1)
+        
         # 1) every unreconciled bank line is work
         for it in self.discover(period):
             self.process_item(it, "bank_line")

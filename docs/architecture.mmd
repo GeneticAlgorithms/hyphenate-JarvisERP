@@ -1,0 +1,51 @@
+flowchart TD
+  subgraph SRC["1 · Systems of record (simulated, seed 2026)"]
+    CH[Chase bank feed]
+    PP[PayPal activity]
+    RA[Ramp card charges]
+    GU[Gusto payroll]
+    DOC[Email and Drive docs<br/>receipts, invoices, W-9s]
+  end
+  subgraph ERP["2 · QBO-style ERP / General Ledger"]
+    BF[Bank feed + QBO suggestions]
+    GL[(General Ledger<br/>chart of accounts)]
+    SUB[AP / AR subledgers<br/>vendor master]
+    RPT[GL detail, BS / IS / CF]
+  end
+  subgraph JAR["3 · JarvisERP: the system of work"]
+    INJ[Scenario injector<br/>judge prompts]
+    AG[Close agents<br/>p1 timing · p2 roll-forward<br/>p3 bank · p4 evidence · p5 vendors]
+    EV[Evidence search<br/>looks up the source record]
+    POL[Policies + precedents<br/>bible: approval matrix, materiality]
+    WI[Work items<br/>new → proposed → needs info<br/>→ approved → posted]
+    DEF[Challenge / defend / concede]
+  end
+  subgraph CTRL["4 · Controls, enforced in code"]
+    RO{Roles check<br/>no self-approval}
+    GW[Ledger gateway<br/>only path that writes]
+    AU[(Hash-chained<br/>append-only audit log)]
+  end
+  subgraph PPL["5 · People and outputs"]
+    CO[Controller<br/>approves or says no]
+    AUD[Auditor<br/>replays the audit log]
+    OUT[Drive evidence folder<br/>September financial package]
+  end
+  CH & PP & RA & GU --> BF
+  DOC --> EV
+  BF --> AG
+  INJ --> AG
+  GL & SUB --> AG
+  AG --> EV --> WI
+  POL --> AG
+  WI -->|unclear: asks| CO
+  CO -->|challenge| DEF
+  DEF -->|holds with evidence<br/>or concedes + re-proposes| WI
+  DEF -->|correction becomes precedent| POL
+  WI -->|approve request| RO
+  CO -->|approves| RO
+  RO -->|agent approving itself: 403 denied| AU
+  RO -->|allowed| GW
+  GW --> GL
+  GW --> AU
+  GL --> RPT --> OUT
+  AU --> AUD

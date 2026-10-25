@@ -102,11 +102,9 @@ class Session:
 
     def try_self_approve(self, item_id: str) -> dict:
         """Demo of LIMITS: the agent attempts to approve its own proposal -> denied in code and logged."""
-        try:
-            transition(self.db, item_id, "approve", actor("jarvis"), reason="(attempting self-approval)")
-            return {"denied": False}
-        except Exception as e:
-            return {"denied": True, "reason": str(e)}
+        # Let Denied exceptions bubble up to be caught by _safe() and return 403
+        transition(self.db, item_id, "approve", actor("jarvis"), reason="(attempting self-approval)")
+        return {"denied": False}
 
     def challenge(self, item_id: str, question: str) -> dict:
         return defend.defend(self.ctx, item_id, question)
