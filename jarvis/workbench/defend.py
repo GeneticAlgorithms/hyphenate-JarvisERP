@@ -88,7 +88,10 @@ def _mind_changers(it):
 def _classify_challenge(question: str) -> str:
     """Classify challenge type: purpose, period, amount, identity, policy, materiality."""
     q = question.lower()
-    if any(w in q for w in ("why not", "what is", "what's", "who is", "merchant", "vendor", "this payment", "company")):
+    # Check materiality FIRST before 'why not' can match
+    if any(w in q for w in ("materiality", "immaterial", "small", "under", "threshold", "does it matter", "just expense it")):
+        return "materiality"  # Materiality threshold
+    if any(w in q for w in ("what is", "what's", "who is", "merchant", "vendor", "this payment", "company")):
         return "identity"  # Who/what is this vendor/transaction
     if any(w in q for w in ("when", "period", "month", "september", "october", "timing", "accrual", "cut-off", "prepaid")):
         return "period"  # When to recognize/which period
@@ -98,8 +101,6 @@ def _classify_challenge(question: str) -> str:
         return "purpose"  # What is this transaction for/how to categorize
     if any(w in q for w in ("policy", "rule", "always", "usually", "precedent", "last time", "should")):
         return "policy"  # Policy/precedent application
-    if any(w in q for w in ("materiality", "immaterial", "small", "under", "threshold", "does it matter")):
-        return "materiality"  # Materiality threshold
     return "general"
 
 
