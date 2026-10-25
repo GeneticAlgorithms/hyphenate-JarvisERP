@@ -261,7 +261,7 @@ def parse(text: str) -> tuple[str, dict]:
                 params["merchant"] = v["qbo_name"]
                 break
         
-        # Try common merchant patterns (Nordstrom, Sephora, Steam, etc.)
+        # Try common merchant patterns (Nordstrom, Sephora, Steam, ACME Corp, etc.)
         if "vendor" not in params and "merchant" not in params:
             # Pattern: "at X" or "from X"
             m = re.search(r'\b(?:at|from)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)', text)
@@ -284,6 +284,18 @@ def parse(text: str) -> tuple[str, dict]:
                         params["merchant"] = matched["qbo_name"]
                     else:
                         params["merchant"] = name
+            # Pattern: capitalized company name at start (e.g. "ACME Corp, PO box")
+            if "merchant" not in params and "vendor" not in params:
+                m = re.search(r'^([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)?)\s*,', text)
+                if m:
+                    name = m.group(1)
+                    matched = _match_vendor(name)
+                    if matched:
+                        params["vendor"] = matched["qbo_name"]
+                        params["merchant"] = matched["qbo_name"]
+                    else:
+                        params["merchant"] = name
+                        params["vendor"] = name
     
     # Extract cardholder
     cardholder = _match_cardholder(text)
