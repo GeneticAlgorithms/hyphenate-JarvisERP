@@ -220,7 +220,7 @@ def defend(run, it, question: str) -> dict:
     if concession:
         from jarvis.work.transition import transition, create_item, now
         from jarvis.work.roles import actor
-        from jarvis.agent.context import SYNC
+        from jarvis.work.sync import SYNC
         
         try:
             # Execute withdrawal transition
