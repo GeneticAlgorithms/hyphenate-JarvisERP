@@ -327,9 +327,9 @@ def challenge(item_id: str, body: dict = Body(...)):
 
 @app.post("/api/item/{item_id}/self-approve")
 def self_approve(item_id: str):
-    r = S().try_self_approve(item_id)
+    r = _safe(S().try_self_approve, item_id)
     events.publish("refresh")
-    return r
+    return r if isinstance(r, JSONResponse) else r
 
 
 @app.post("/api/policy/{policy_id}/{version}/{decision}")
