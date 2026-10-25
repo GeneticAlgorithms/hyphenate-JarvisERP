@@ -96,6 +96,13 @@ def _parse_date(text: str) -> str | None:
         if 1 <= day <= 31:
             return f"2026-{month:02d}-{day:02d}"
     
+    # Match 'on the 29th' or 'the 15th' format (default to September)
+    m = re.search(r'\b(?:on )?the (\d{1,2})(?:st|nd|rd|th)\b', text.lower())
+    if m:
+        day = int(m.group(1))
+        if 1 <= day <= 31:
+            return f"2026-09-{day:02d}"
+    
     return None
 
 
@@ -284,8 +291,9 @@ def parse(text: str) -> tuple[str, dict]:
         params["cardholder"] = cardholder
     
     # Classify (be conservative - use needs_info if unclear)
-    # Check for described bank line first (e.g. "$742.18 SQ *MOONLIGHT GEAR 9/29")
-    has_bank_descriptor = bool(re.search(r'\$[\d,]+\.\d{2}\s+[A-Z*]+\s+', text))
+    # Check for described bank line first (e.g. "$742.18 SQ *MOONLIGHT GEAR 9/29" or "debit 'ACME SUPPLY'")
+    has_bank_descriptor = bool(re.search(r'\$[\d,]+\.\d{2}\s+[A-Z*]+\s+', text)) or \
+                         ("debit" in t_lower and (quoted or params.get("merchant")))
     
     # Vendor bank change - broader pattern matching
     if (any(w in t_lower for w in ["bank details", "bank account", "bank acct", "banking"]) or 
@@ -324,10 +332,13 @@ def parse(text: str) -> tuple[str, dict]:
         # Described bank line -> unknown_debit
         k = "unknown_debit"
         if not params.get("description"):
-            # Extract the descriptor portion
+            # Extract the descriptor portion - try bank line format first
             m = re.search(r'\$[\d,]+\.\d{2}\s+([A-Z*][A-Z0-9*\s]+)', text)
             if m:
                 params["description"] = m.group(1).strip()
+            # Try quoted merchant as description
+            elif params.get("merchant"):
+                params["description"] = params["merchant"]
     elif "wire" in t_lower and (" in" in t_lower or "incoming" in t_lower):
         k = "needs_info"  # Incoming wire
     elif "boat" in t_lower or "auditor" in t_lower:
@@ -488,6 +499,10 @@ def inject(session, text: str | None = None, template: str | None = None, params
                 return {"template": "needs_info", "params": params, "parser": params.get("_parser", "deterministic"),
                         "items": [{"item_id": it["item_id"], "state": it["state"], "kind": it["kind"],
                                   "title": it["title"], "rationale": rationale, "parser": params.get("_parser", "deterministic")}]}
+            
+            # Fill in reasonable defaults for optional fields
+            if template == "unknown_debit" and "date" not in params:
+                params["date"] = "2026-09-29"  # Default to end of Sep
         else:
             # Explicit template call - merge defaults
             params = {**TEMPLATES[template]["params"], **(params or {})}
