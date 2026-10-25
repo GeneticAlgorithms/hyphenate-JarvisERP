@@ -63,8 +63,9 @@ def _select_models() -> dict[str, str]:
         
         # Sort: prefer higher version numbers (5-5 > 4-5 > 3-5), then dates if present
         def model_sort_key(model_id: str) -> tuple:
-            # Extract version numbers like 5-5, 4-5, or 3-5
-            version_match = re.search(r'(\d+)[-.]\s*(\d+)', model_id)
+            # Extract version numbers like 5-5, 4-5, or 3-5 (but NOT YYYYMMDD date suffixes)
+            # Match major-minor pattern but not 8-digit years
+            version_match = re.search(r'(\d+)-(\d+)(?!-?\d{6})', model_id)
             if version_match:
                 major, minor = int(version_match.group(1)), int(version_match.group(2))
             else:
