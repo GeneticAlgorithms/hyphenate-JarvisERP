@@ -893,13 +893,21 @@ function initGlossary() {
       });
     });
 
-    // Animate cards in
-    gsap.from('.term-card', {
-      opacity: 0,
-      y: 20,
-      duration: 0.4,
-      stagger: 0.03
-    });
+    // Animate cards in with fromTo to override CSS transitions
+    gsap.fromTo('.term-card', 
+      {
+        opacity: 0,
+        y: 20
+      },
+      {
+        opacity: 1,
+        y: 0,
+        duration: 0.4,
+        stagger: 0.03,
+        ease: 'power2.out',
+        clearProps: 'transform'
+      }
+    );
   };
 
   // Initial render

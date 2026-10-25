@@ -2237,20 +2237,33 @@ h3 { font-size: 1.75rem; margin-bottom: 1rem; }
   position: absolute;
   opacity: 0;
   pointer-events: none;
+  z-index: 5;
 }
 
 .connector.visible {
   opacity: 1;
-  animation: connectorDraw 1s ease-in-out;
+  animation: connectorDraw 1s ease-in-out infinite;
 }
 
 @keyframes connectorDraw {
-  from {
-    stroke-dashoffset: 100;
-  }
-  to {
+  0%, 100% {
     stroke-dashoffset: 0;
   }
+  50% {
+    stroke-dashoffset: 10;
+  }
+}
+
+#connector1 {
+  left: calc(33.33% - 30px);
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+#connector2 {
+  left: calc(66.66% - 70px);
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .fit-connectors {
